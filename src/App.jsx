@@ -697,11 +697,15 @@ REQUISITOS DE CALIDAD:
       const raw = parsearJSONSeguro(txt);
 
       // Normalización v18 → forma que consume la UI actual (no destructivo)
+      // Además conservamos los campos ricos para mostrarlos separados en el modal y guardarlos mejor.
       const d = {
         observacion: raw.loQueElTextoDice || raw.observacion || raw.texto || "",
         contexto: [raw.contextoHistorico, raw.contextoLiterario, raw.contexto]
           .filter(Boolean)
           .join(" | ") || raw.contexto || "",
+        // Campos ricos v18 (pueden usarse directamente)
+        contextoHistorico: raw.contextoHistorico || "",
+        contextoLiterario: raw.contextoLiterario || "",
         interpretaciones: raw.puntosAbiertos || raw.interpretaciones || raw.puntos || [],
         preguntas: raw.preguntasDiscernimiento || raw.preguntas || raw.preguntasDeDiscernimiento || []
       };
@@ -718,9 +722,13 @@ REQUISITOS DE CALIDAD:
     if (!anDatos) return;
     const parrafos = [
       "LO QUE EL TEXTO DICE — " + anDatos.observacion,
-      "CONTEXTO — " + anDatos.contexto,
+      // v18: guardar contexto separado cuando exista para preservar la profundidad
+      anDatos.contextoHistorico ? "CONTEXTO HISTÓRICO — " + anDatos.contextoHistorico : null,
+      anDatos.contextoLiterario ? "CONTEXTO LITERARIO — " + anDatos.contextoLiterario : null,
+      // fallback combinado solo si no hay los separados
+      (!anDatos.contextoHistorico && !anDatos.contextoLiterario) ? "CONTEXTO — " + anDatos.contexto : null,
       ...(anDatos.interpretaciones || []).map((it) => "PUNTO ABIERTO · " + it.tema + " — " + (it.lecturas || []).join(" · ")),
-    ];
+    ].filter(Boolean);
     const discernimiento = (anDatos.preguntas || []).map((p, i) => ({ pregunta: p, respuesta: (anResp[i] || "").trim() }));
     const nuevo = {
       id: "a_" + Date.now(),
@@ -1264,7 +1272,19 @@ REQUISITOS DE CALIDAD:
               {anDatos && (
                 <div>
                   <Seccion titulo="LO QUE EL TEXTO DICE" nota="observable en el pasaje">{anDatos.observacion}</Seccion>
-                  <Seccion titulo="CONTEXTO" nota="histórico y literario">{anDatos.contexto}</Seccion>
+
+                  {/* v18: mostramos contexto histórico y literario por separado cuando vienen del análisis profundo */}
+                  {anDatos.contextoHistorico && (
+                    <Seccion titulo="CONTEXTO HISTÓRICO" nota="hechos verificables del mundo bíblico">{anDatos.contextoHistorico}</Seccion>
+                  )}
+                  {anDatos.contextoLiterario && (
+                    <Seccion titulo="CONTEXTO LITERARIO" nota="intertextualidad, género y estructura">{anDatos.contextoLiterario}</Seccion>
+                  )}
+                  {/* Fallback para compatibilidad cuando solo hay contexto combinado */}
+                  {!anDatos.contextoHistorico && !anDatos.contextoLiterario && anDatos.contexto && (
+                    <Seccion titulo="CONTEXTO" nota="histórico y literario">{anDatos.contexto}</Seccion>
+                  )}
+
                   {(anDatos.interpretaciones || []).map((it, i) => (
                     <div key={i} className="px-3 py-2 rounded-md mb-2" style={{ background: "#FFFDF6", borderLeft: `3px solid ${C.papelBorde}` }}>
                       <div style={{ fontSize: 9.5, letterSpacing: "0.15em", color: "#8A6A20", fontWeight: 700 }}>PUNTO ABIERTO · interpretaciones, no son el texto</div>
