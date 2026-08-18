@@ -1,17 +1,14 @@
 import { useState, useRef, useEffect } from "react";
 
 // ============================================================
-// ABIGAIL · אביגיל — Prototipo v17 (mejorada en laboratorio)
-// Novedad principal: PWA completa + mejor mobile UX + más texto real.
-// - Configuración VitePWA + manifest mejorado (instalable, offline).
-// - Viewport optimizado (no zoom, mejor táctil).
-// - Agregados capítulos reales de RVR1960 (Juan 1, Romanos 8, Salmos 23, Mateo 5).
-// - Búsqueda rápida de pasajes (icono lupa en header).
-// - Mejoras de responsividad y accesibilidad (mejor contraste en botones, focus).
-// - Versión propia del taller avanzando (nota en Génesis 1:1).
-// - Todo el resto del diseño, Cerebro, comité, análisis crítico y modelo de datos
-//   se conserva fielmente (especificación viva para la app Android real).
-// El porqué de cada cadena sigue siendo el corazón de Abigail.
+// ABIGAIL · אביגיל — Prototipo v18 (laboratorio)
+// Enfoque principal: Profundización fuerte en análisis bíblico e histórico.
+// - Análisis Crítico significativamente mejorado: mayor profundidad histórica,
+//   cultural, literaria y exegética, manteniendo estricta neutralidad.
+// - Prompt del sistema más exigente y estructurado.
+// - Mejor integración con el Cerebro de Abigail y convicciones previas.
+// - Todo sigue siendo especificación viva para la app Android real.
+// El porqué del lector y el discernimiento siguen siendo el corazón.
 // ============================================================
 
 const C = {
@@ -547,8 +544,8 @@ export default function Abigail() {
     try {
       const material = materialCerebro();
       if (material.length === 0) { setCerebroMsg("Aún no hay material — estudia un poco primero"); return; }
-      const sys = "Eres el archivista fiel de un estudioso de la Biblia Reina-Valera 1960. Sintetizas su perfil de estudio SOLO con el material dado, sin inventar ni añadir nada ajeno. Responde ÚNICAMENTE un objeto JSON válido.";
-      const usr = 'Material completo del lector: """' + material.join("\n") + '""" Produce: {"sintesis":"perfil compacto y fiel, máximo 250 palabras: sus convicciones centrales ya discernidas, los temas que estudia, cómo razona y conecta pasajes, y qué preguntas ya tiene resueltas"}';
+      const sys = "Eres el archivista fiel de un estudioso de la Biblia Reina-Valera 1960. Sintetizas su perfil de estudio SOLO con el material que te entrego. No inventes ni añadas doctrina ajena. Destila con precisión histórica y teológica: identifica temas centrales, cadenas intertextuales que el lector ha trazado, convicciones ya formadas, patrones de razonamiento y preguntas que ya ha resuelto. Sé compacto y fiel. Responde ÚNICAMENTE un objeto JSON válido.";
+      const usr = 'Material completo del lector (cadenas, estudios, notas, convicciones, pasajes leídos):\n"""' + material.join("\n") + '"""\n\nProduce exactamente:\n{"sintesis":"perfil compacto (máx 250 palabras). Incluye: (1) convicciones centrales ya discernidas con sus anclas, (2) temas históricos/teológicos que más estudia, (3) cómo conecta pasajes (cadenas), (4) preguntas ya resueltas. Usa referencias concretas cuando sea posible."}';
       const txt = await llamarIA([{ role: "system", content: sys }, { role: "user", content: usr }], iaConf.activo, true);
       const d = parsearJSONSeguro(txt);
       if (!d.sintesis) throw new Error("La síntesis llegó vacía — intenta de nuevo");
@@ -577,8 +574,8 @@ export default function Abigail() {
     const lista = proveedoresListos();
     if (lista.length === 0) { setIaError("Agrega al menos una clave en ✦ IA (arriba a la derecha)"); return; }
     setIaCargando(true); setIaError(""); setIaSugerencias([]);
-    const sys = "Eres un asistente de estudio bíblico serio, basado en la Biblia Reina-Valera 1960. Sugieres concordancias (referencias cruzadas) precisas y verificables, cada una con un porqué breve. Respondes ÚNICAMENTE un arreglo JSON válido, sin texto adicional ni marcas de código.";
-    const usr = contextoAncla() + ' Sugiere de 3 a 5 concordancias para esa ancla. Escribe cada referencia con el nombre completo del libro en español. Formato exacto: {"sugerencias":[{"referencia":"Libro Cap:Vers","tipo":"Profecía|Cumplimiento|Paralelo|Contexto|Explicación","porque":"una o dos frases"}]}' + bloqueConvicciones();
+    const sys = "Eres un asistente de estudio bíblico serio y preciso, basado en la Biblia Reina-Valera 1960. Sugieres concordancias (referencias cruzadas) verificables, ancladas al texto y su contexto histórico/literario. Prefieres conexiones reales del Antiguo y Nuevo Testamento. Respondes ÚNICAMENTE un arreglo JSON válido, sin texto adicional ni marcas de código.";
+    const usr = contextoAncla() + ' Sugiere de 3 a 5 concordancias precisas y útiles para esa ancla. Usa nombre completo del libro en español (ej: "Malaquías 4:5"). Tipos permitidos: Profecía, Cumplimiento, Paralelo, Contexto, Explicación. Cada una debe tener un "porque" de 1-2 frases que explique el vínculo textual o histórico. Formato exacto: {"sugerencias":[{"referencia":"Libro Cap:Vers","tipo":"Profecía|Cumplimiento|Paralelo|Contexto|Explicación","porque":"una o dos frases"}]}' + bloqueConvicciones();
     const resultados = await Promise.allSettled(lista.map(async (id) => {
       const txt = await llamarIA([{ role: "system", content: sys }, { role: "user", content: usr }], id, true);
       const d = parsearJSONSeguro(txt);
@@ -648,16 +645,70 @@ export default function Abigail() {
     catch (e) { setIaPrueba("✗ " + (e.message || "falló")); }
   };
 
-  // ---- Análisis crítico: la IA estratifica, el lector discierne ----
+  // ---- Análisis crítico v18: profundidad histórica, cultural y exegética ----
+  // REGLAS ESTRICTAS:
+  // - IA propone, lector decide. Nunca tomes partido doctrinal.
+  // - Separa claramente: (1) LO QUE EL TEXTO DICE (observable en el pasaje RVR1960), (2) CONTEXTO factual (histórico, cultural, literario verificable), (3) PUNTOS ABIERTOS donde las tradiciones difieren (presenta sin favoritismo), (4) PREGUNTAS DE DISCERNIMIENTO que avancen sobre las convicciones ya guardadas.
+  // - Solo hechos históricos/culturales seguros. Si es conjetura, dilo. Cita contexto del siglo I, geografía, costumbres judías, imperio romano, literatura intertestamentaria y del AT cuando sea relevante y verificable.
+  // - Exégesis anclada al texto: estructura, repeticiones, palabras clave en español del pasaje, progresión, inclusiones, quiasmos, actores, tiempo, lugar.
+  // - Respeta el Cerebro y últimas convicciones: no repitas preguntas ya respondidas; construye sobre ellas.
+  // - Respuesta SOLO JSON válido. Sin preámbulos, sin moralizar, sin aplicaciones devocionales.
   const analizarPasaje = async () => {
     setAnCargando(true); setAnError(""); setAnDatos(null); setAnResp({});
     try {
       const cuerpo = pasaje.versiculos.map((v) => v.n + " " + v.t).join(" ");
-      const sys = "Eres un asistente de análisis bíblico riguroso y reverente, basado en la Biblia Reina-Valera 1960. Regla suprema: distingue siempre entre (1) lo que el texto DICE —observable en el pasaje— y (2) las INTERPRETACIONES humanas y doctrinales. Nunca presentes la doctrina de una tradición como si fuera el texto mismo. Donde las tradiciones cristianas difieren, no tomes partido: expón las lecturas principales con neutralidad y formula preguntas para que el lector discierna delante de Dios. Si recibes convicciones ya discernidas por el lector, no repitas esas preguntas: construye sobre ellas y formula preguntas nuevas que avancen su estudio. Responde ÚNICAMENTE un objeto JSON válido, sin marcas de código.";
-      const usr = `Analiza ${pasaje.titulo} (${pasaje.seccion}). Texto de trabajo: "${cuerpo}". Formato exacto: {"observacion":"qué dice el texto: estructura, personajes, movimientos y palabras clave, en un párrafo","contexto":"contexto histórico y literario factual, en un párrafo","interpretaciones":[{"tema":"punto donde las lecturas difieren","lecturas":["lectura A y quiénes la sostienen","lectura B y quiénes la sostienen"]}],"preguntas":["pregunta de discernimiento para el lector"]} — incluye 2 o 3 temas de interpretación y 3 preguntas.` + bloqueConvicciones();
+      const sys = "Eres un exegeta riguroso y neutral especializado en la Biblia Reina-Valera 1960. Tu única tarea es ayudar al lector a escudriñar. REGLA SUPREMA: distingue siempre (A) lo que el texto DICE (palabras, estructura, acciones, personajes presentes en el pasaje) de (B) interpretaciones, doctrinas y aplicaciones humanas. Nunca presentes como 'lo que dice el texto' lo que es enseñanza de una tradición específica. Cuando las grandes corrientes cristianas (patrística, medieval, reforma, moderna, pentecostal, etc.) o lecturas judías difieren, expón las posiciones principales con honestidad y sin tomar partido. Formula preguntas para que el lector discierna delante de Dios y de la Escritura. Si recibes convicciones ya discernidas por el lector, respétalas, no las repitas y formula preguntas nuevas que profundicen. Usa SOLO hechos históricos y culturales verificables del mundo bíblico (siglo I, Palestina, judaísmo del Segundo Templo, imperio romano, geografía, costumbres, intertextualidad con AT). Señala cuando algo es conjetura académica. Responde ÚNICAMENTE un objeto JSON válido, sin texto fuera de las llaves, sin ```.";
+      const usr = `Analiza con profundidad el pasaje ${pasaje.titulo} — ${pasaje.seccion}.
+
+TEXTO COMPLETO DE TRABAJO (Reina-Valera 1960):
+"${cuerpo}"
+
+INSTRUCCIONES DE SALIDA (JSON estricto):
+Produce un objeto con esta estructura exacta:
+{
+  "loQueElTextoDice": "Descripción densa y precisa de lo que el texto dice literalmente: estructura del pasaje, personajes, acciones, secuencia, palabras clave repetidas o significativas tal como aparecen en español, progresión argumental o narrativa, inclusiones, contrastes. Cita expresiones concretas del texto. 3-6 oraciones densas.",
+  "contextoHistorico": "Contexto histórico y cultural factual verificable: época, lugar, costumbres judías del periodo, trasfondo político (Herodes, Roma, prefectos), prácticas religiosas, expectativas mesiánicas, geografía relevante. Solo hechos; indica si es reconstrucción probable.",
+  "contextoLiterario": "Contexto literario e intertextual: género del pasaje, relación con el libro completo, ecos o citas del Antiguo Testamento (con referencia), paralelos cercanos en otros evangelios o epístolas, estructura retórica. Señala anclajes textuales claros.",
+  "puntosAbiertos": [
+    {
+      "tema": "Breve título del punto donde las interpretaciones difieren (ej: 'Identidad de Elías en el pasaje')",
+      "lecturas": [
+        "Lectura A — quiénes la sostienen tradicionalmente y argumento breve basado en texto o tradición",
+        "Lectura B — quiénes la sostienen y argumento breve",
+        "Lectura C (si existe) — ..."
+      ]
+    }
+  ],
+  "preguntasDiscernimiento": [
+    "Pregunta 1 que invite al lector a comparar el texto con otros pasajes y formar su propia convicción",
+    "Pregunta 2 que avance más allá de lo ya respondido en su estudio previo",
+    "..."
+  ]
+}
+
+REQUISITOS DE CALIDAD:
+- Incluye al menos 3 puntos abiertos relevantes cuando sea pertinente.
+- Genera entre 4 y 6 preguntas de discernimiento agudas.
+- Las preguntas deben invitar a leer más Escritura, no a opinar subjetivamente.
+- Aprovecha el bloque de CEREBRO Y CONVICCIONES que viene después para no repetir lo ya resuelto.
+` + bloqueConvicciones();
+
       const txt = await llamarIA([{ role: "system", content: sys }, { role: "user", content: usr }], iaConf.activo, true);
-      const d = parsearJSONSeguro(txt);
-      if (!d.observacion || !d.preguntas) throw new Error("Respuesta incompleta del consejero — intenta de nuevo");
+      const raw = parsearJSONSeguro(txt);
+
+      // Normalización v18 → forma que consume la UI actual (no destructivo)
+      const d = {
+        observacion: raw.loQueElTextoDice || raw.observacion || raw.texto || "",
+        contexto: [raw.contextoHistorico, raw.contextoLiterario, raw.contexto]
+          .filter(Boolean)
+          .join(" | ") || raw.contexto || "",
+        interpretaciones: raw.puntosAbiertos || raw.interpretaciones || raw.puntos || [],
+        preguntas: raw.preguntasDiscernimiento || raw.preguntas || raw.preguntasDeDiscernimiento || []
+      };
+
+      if (!d.observacion || !d.preguntas || d.preguntas.length === 0) {
+        throw new Error("Respuesta incompleta del consejero — intenta de nuevo o cambia de proveedor");
+      }
       setAnDatos(d);
     } catch (e) { setAnError(e.message || "No pude analizar el pasaje"); }
     setAnCargando(false);

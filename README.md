@@ -6,7 +6,12 @@ Esta es la versión de **laboratorio** (prototipo web React + Vite). Sirve como:
 - Herramienta real de estudio (funciona en Termux, navegador y como PWA instalable)
 - Especificación viva de diseño, UX y modelo de datos para la **app Android real** ("Biblia-AbigailRV 1960")
 
-### Características principales (v17)
+### Características principales (v18 — laboratorio)
+- Análisis crítico significativamente profundizado: contexto histórico verificable (siglo I, judaísmo del Segundo Templo, imperio romano), contexto literario e intertextual, separación estricta entre "lo que el texto dice" y "puntos abiertos" (neutralidad total).
+- Formato de salida más rico y estructurado: `loQueElTextoDice`, `contextoHistorico`, `contextoLiterario`, `puntosAbiertos`, `preguntasDiscernimiento`.
+- Normalización compatible con la UI actual.
+- Cerebro de Abigail mejorado para memoria histórica y teológica más fiel.
+- Todo lo anterior sigue siendo "especificación viva" para la app Android real.
 - Lectura inmersiva con estética púrpura noche, oro y papel pergamino
 - Cadenas bidireccionales con **ancla precisa** (palabra/frase/versículo) + letras voladas
 - Margen por toque largo, panel de versículo, resaltados, anotaciones
