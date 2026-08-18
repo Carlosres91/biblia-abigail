@@ -3,11 +3,12 @@ import { useState, useRef, useEffect } from "react";
 // ============================================================
 // ABIGAIL · אביגיל — Prototipo v18 (laboratorio)
 // Enfoque principal: Profundización fuerte en análisis bíblico e histórico.
-// - Análisis Crítico significativamente mejorado: mayor profundidad histórica,
-//   cultural, literaria y exegética, manteniendo estricta neutralidad.
-// - Prompt del sistema más exigente y estructurado.
-// - Mejor integración con el Cerebro de Abigail y convicciones previas.
-// - Todo sigue siendo especificación viva para la app Android real.
+// - Análisis Crítico v18: prompt exegeta riguroso + neutral. Separa
+//   LO QUE EL TEXTO DICE | CONTEXTO HISTÓRICO | CONTEXTO LITERARIO
+//   | PUNTOS ABIERTOS (neutral) | PREGUNTAS DE DISCERNIMIENTO.
+// - UI muestra los contextos por separado cuando vienen del análisis.
+// - Guardado preserva la profundidad. Cerebro y concordancias también refinados.
+// - Todo es especificación viva para la app Android real (no se pierde nada).
 // El porqué del lector y el discernimiento siguen siendo el corazón.
 // ============================================================
 
@@ -526,16 +527,58 @@ export default function Abigail() {
     return lista.slice(-12);
   };
 
-  // ---- el Cerebro de Abigail: todo el estudio del lector, destilado ----
+  // ---- el Cerebro de Abigail: todo el estudio del lector, destilado (v18 pulido) ----
   const materialCerebro = () => {
     const partes = [];
+    const MAX = 4200; // límite suave para no inflar tokens
+    let chars = 0;
+
+    const push = (s) => {
+      if (chars + s.length > MAX) return false;
+      partes.push(s);
+      chars += s.length + 1;
+      return true;
+    };
+
+    // 1. Convictions from IA-assisted and manual studies (respuestas del lector)
     estudios.filter((e) => e.propio).forEach((e) => {
-      (e.discernimiento || []).forEach((d) => { if ((d.respuesta || "").trim()) partes.push(`CONVICCIÓN [${e.ancla}] ${d.pregunta} → ${String(d.respuesta).trim()}`); });
+      (e.discernimiento || []).forEach((d) => {
+        const r = (d.respuesta || "").trim();
+        if (r) {
+          push(`CONVICCIÓN [${e.ancla}] ${String(d.pregunta).slice(0,110)} → ${r.slice(0,180)}`);
+        }
+      });
+      // Include key content from saved studies (especially IA-assisted) for historical/theological memory
+      if (e.parrafos && e.parrafos.length) {
+        const head = e.parrafos.slice(0, 2).map(p => p.slice(0, 160)).join(" | ");
+        push(`ESTUDIO [${e.ancla}] ${e.titulo}: ${head}`);
+      }
     });
-    cadenas.forEach((c) => { if (c.porque) partes.push(`CADENA${c.sugeridaIA ? " (aceptada de IA)" : ""} ${refDe(c.desdeClave)} ⟶ ${c.hastaRef}: ${c.porque}`); });
-    Object.entries(notas).forEach(([k, t]) => partes.push(`NOTA [${refDe(k.split("@")[0])}] ${t}`));
-    estudios.filter((e) => e.propio).forEach((e) => partes.push(`ESTUDIO: ${e.titulo}`));
-    Object.values(pasajes).forEach((p) => { if (!PASAJES[p.id]) partes.push(`LEYENDO: ${p.titulo}`); });
+
+    // 2. Chains with their "porqué" — these are the strongest intertextual memory
+    cadenas.forEach((c) => {
+      if (c.porque) {
+        const tipo = c.tipo ? ` (${c.tipo})` : "";
+        const ia = c.sugeridaIA ? " [IA]" : "";
+        push(`CADENA${ia}${tipo} ${refDe(c.desdeClave)} ⟶ ${c.hastaRef}: ${String(c.porque).slice(0,140)}`);
+      }
+    });
+
+    // 3. Notes (reader annotations)
+    Object.entries(notas).forEach(([k, t]) => {
+      push(`NOTA [${refDe(k.split("@")[0])}] ${String(t).slice(0,120)}`);
+    });
+
+    // 4. Currently reading custom passages
+    Object.values(pasajes).forEach((p) => {
+      if (!PASAJES[p.id]) push(`LEYENDO: ${p.titulo}`);
+    });
+
+    // 5. Add titles of all saved studies (for topic overview)
+    estudios.filter((e) => e.propio).slice(-6).forEach((e) => {
+      push(`TÍTULO ESTUDIO: ${e.titulo} (${e.ancla})`);
+    });
+
     return partes;
   };
 
@@ -544,8 +587,8 @@ export default function Abigail() {
     try {
       const material = materialCerebro();
       if (material.length === 0) { setCerebroMsg("Aún no hay material — estudia un poco primero"); return; }
-      const sys = "Eres el archivista fiel de un estudioso de la Biblia Reina-Valera 1960. Sintetizas su perfil de estudio SOLO con el material que te entrego. No inventes ni añadas doctrina ajena. Destila con precisión histórica y teológica: identifica temas centrales, cadenas intertextuales que el lector ha trazado, convicciones ya formadas, patrones de razonamiento y preguntas que ya ha resuelto. Sé compacto y fiel. Responde ÚNICAMENTE un objeto JSON válido.";
-      const usr = 'Material completo del lector (cadenas, estudios, notas, convicciones, pasajes leídos):\n"""' + material.join("\n") + '"""\n\nProduce exactamente:\n{"sintesis":"perfil compacto (máx 250 palabras). Incluye: (1) convicciones centrales ya discernidas con sus anclas, (2) temas históricos/teológicos que más estudia, (3) cómo conecta pasajes (cadenas), (4) preguntas ya resueltas. Usa referencias concretas cuando sea posible."}';
+      const sys = "Eres el archivista fiel de un estudioso serio de la Biblia Reina-Valera 1960. Tu única fuente es el material que te entrego. No inventes, no añadas doctrina, no moralices. Destila un perfil preciso y útil que otras IAs puedan usar después como contexto fiel. Prioriza: (1) convicciones reales ya respondidas por el lector con sus anclas, (2) temas teológicos e históricos que aparecen repetidamente, (3) conexiones intertextuales explícitas que el lector ha hecho (cadenas), (4) patrones de cómo razona y qué preguntas ya ha cerrado. Sé compacto, concreto y fiel. Incluye referencias bíblicas cuando aparezcan. Responde ÚNICAMENTE JSON válido.";
+      const usr = 'MATERIAL DEL LECTOR:\n"""' + material.join("\n") + '"""\n\nProduce exactamente este JSON:\n{"sintesis":"Texto compacto máximo 260 palabras. Estructura natural: Convicciones centrales (con anclas), Temas que más estudia (histórico/teológico), Cómo conecta pasajes (cadenas clave), Preguntas ya resueltas. Usa referencias concretas del material. No repitas el material crudo."}';
       const txt = await llamarIA([{ role: "system", content: sys }, { role: "user", content: usr }], iaConf.activo, true);
       const d = parsearJSONSeguro(txt);
       if (!d.sintesis) throw new Error("La síntesis llegó vacía — intenta de nuevo");
@@ -557,9 +600,13 @@ export default function Abigail() {
   const bloqueConvicciones = () => {
     if (iaConf.usarDiscernimiento === false) return "";
     const trozos = [];
-    if (cerebro.sintesis) trozos.push(" CEREBRO DEL LECTOR (síntesis fiel de todo su estudio; respétala, no repitas lo ya resuelto, construye sobre esto): " + cerebro.sintesis);
-    const frescas = conviccionesLector().slice(-8);
-    if (frescas.length > 0) trozos.push(" ÚLTIMAS CONVICCIONES: " + frescas.map((c) => `[${c.ancla}] ${c.pregunta} → ${c.respuesta}`).join(" · "));
+    if (cerebro.sintesis) {
+      trozos.push(" [CEREBRO DE ABIGAIL — memoria fiel de todo tu estudio. Respétalo estrictamente: no repitas lo ya resuelto ni contradigas las convicciones que el lector ya formó. Construye sobre esto, avanza. Síntesis: " + cerebro.sintesis + " ]");
+    }
+    const frescas = conviccionesLector().slice(-6);
+    if (frescas.length > 0) {
+      trozos.push(" [ÚLTIMAS CONVICCIONES DEL LECTOR — ya discernidas y respondidas; no preguntes lo mismo otra vez: " + frescas.map((c) => `[${c.ancla}] ${c.pregunta} → ${c.respuesta}`).join(" · ") + " ]");
+    }
     return trozos.join("");
   };
 
@@ -1333,12 +1380,37 @@ REQUISITOS DE CALIDAD:
               </label>
               <div className="px-3 py-3 rounded-md mb-2" style={{ background: "#FFFDF6", border: `1px solid ${C.papelBorde}` }}>
                 <div style={{ fontSize: 10, letterSpacing: "0.18em", color: C.tintaSuave, marginBottom: 4 }}>CEREBRO DE ABIGAIL</div>
-                <div style={{ fontSize: 11.5, color: C.tintaSuave, lineHeight: 1.5, marginBottom: 6 }}>
+                <div style={{ fontSize: 11.5, color: C.tintaSuave, lineHeight: 1.5, marginBottom: 4 }}>
                   {cerebro.sintesis
-                    ? <>Síntesis de {cerebro.elementos} elementos{materialCerebro().length > cerebro.elementos ? <> · <b style={{ color: "#7A5E10" }}>{materialCerebro().length - cerebro.elementos} nuevos sin sintetizar</b></> : <> · al día</>}</>
-                    : <>Sin sintetizar aún — reúne cadenas, notas y convicciones, y actualízalo para que las IAs entren sabiéndolo todo.</>}
+                    ? <>Síntesis de <b>{cerebro.elementos}</b> elementos {materialCerebro().length > cerebro.elementos ? <><b style={{ color: "#7A5E10" }}>· {materialCerebro().length - cerebro.elementos} nuevos sin sintetizar</b></> : <>· al día</>}</>
+                    : <>Sin sintetizar aún — reúne cadenas, notas, convicciones y estudios para que las IAs sepan lo que ya has discernido.</>}
                 </div>
-                <button onClick={actualizarCerebro} className="w-full py-2 rounded-full" style={{ background: C.noche, color: C.oroClaro, fontSize: 12, fontWeight: 700 }}>✦ Actualizar cerebro ahora</button>
+
+                {cerebro.sintesis && cerebro.actualizado && (
+                  <div style={{ fontSize: 10, color: C.tintaSuave, marginBottom: 6 }}>
+                    Última síntesis: {new Date(cerebro.actualizado).toLocaleDateString()} {new Date(cerebro.actualizado).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                  </div>
+                )}
+
+                {cerebro.sintesis && (
+                  <details style={{ marginBottom: 6 }}>
+                    <summary style={{ fontSize: 10.5, color: "#7A5E10", cursor: "pointer", fontWeight: 600 }}>Ver resumen actual del Cerebro</summary>
+                    <div style={{ fontSize: 11, color: C.tinta, marginTop: 4, lineHeight: 1.45, maxHeight: 110, overflow: "auto", background: "#FFFBF0", padding: "6px 8px", borderRadius: 4 }}>
+                      {cerebro.sintesis}
+                    </div>
+                  </details>
+                )}
+
+                <div className="flex gap-2">
+                  <button onClick={actualizarCerebro} disabled={cerebroMsg.startsWith("…")} className="flex-1 py-2 rounded-full" style={{ background: C.noche, color: C.oroClaro, fontSize: 12, fontWeight: 700, opacity: cerebroMsg.startsWith("…") ? 0.6 : 1 }}>
+                    ✦ Actualizar cerebro ahora
+                  </button>
+                  {cerebro.sintesis && (
+                    <button onClick={() => { if (confirm("¿Borrar el Cerebro de Abigail? Se perderá la síntesis actual.")) { setCerebro({ sintesis: "", actualizado: "", elementos: 0 }); setCerebroMsg("Cerebro borrado"); } }} className="px-3 py-2 rounded-full" style={{ border: `1px solid ${C.tinta}`, fontSize: 11, color: C.tinta }}>
+                      Borrar
+                    </button>
+                  )}
+                </div>
                 {cerebroMsg && <div style={{ fontSize: 11.5, fontWeight: 700, marginTop: 6, color: cerebroMsg.startsWith("✓") ? "#4C5E1E" : cerebroMsg.startsWith("✗") ? "#8A3030" : C.tintaSuave }}>{cerebroMsg}</div>}
               </div>
               <button onClick={probarIA} className="w-full py-2 rounded-full mb-2" style={{ border: `1px solid ${C.oro}`, color: "#7A5E10", fontSize: 12.5, fontWeight: 700 }}>Probar conexión</button>
