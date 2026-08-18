@@ -296,6 +296,12 @@ export default function Abigail() {
   const [cerebro, setCerebro] = useState(() => cargar("abigail.cerebro", { sintesis: "", actualizado: "", elementos: 0 }));
   const [cerebroMsg, setCerebroMsg] = useState("");
   const autoCerebroEnCurso = useRef(false);
+
+  // Contexto histórico por versículo / ancla (palabra o frase)
+  // clave = "libro:cap:vers" o "libro:cap:vers@ini-fin"
+  const [vrContextos, setVrContextos] = useState(() => cargar("abigail.vrContextos", {}));
+  const [ctxCargando, setCtxCargando] = useState(false);
+  const [ctxError, setCtxError] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -314,9 +320,13 @@ export default function Abigail() {
   useEffect(() => { guardarLocal("abigail.ia", iaConf); }, [iaConf]);
   useEffect(() => { guardarLocal("abigail.estudios", estudios.filter((e) => e.propio)); }, [estudios]);
   useEffect(() => { guardarLocal("abigail.cerebro", cerebro); }, [cerebro]);
+  useEffect(() => { guardarLocal("abigail.vrContextos", vrContextos); }, [vrContextos]);
 
   const pasaje = pasajes[pasajeId] || PASAJES.mr9;
   const clave = (pid, n) => `${pid}:${n}`;
+
+  // Clave para contexto histórico: versículo completo o anclado a rango de palabras
+  const ctxKey = (k, ancla) => ancla && ancla.ini != null ? `${k}@${ancla.ini}-${ancla.fin}` : k;
   const refDe = (k) => { if (!k) return ""; const [pid, n] = k.split(":"); const p = pasajes[pid]; return p ? `${p.corto}:${n}` : k; };
   const versiculoDe = (k) => { const [pid, n] = k.split(":"); const p = pasajes[pid]; return p ? p.versiculos.find((v) => v.n === +n) : null; };
   const aKey = (k, a) => (a ? `${k}@${a.ini}-${a.fin}` : k);
@@ -580,6 +590,11 @@ export default function Abigail() {
       push(`TÍTULO ESTUDIO: ${e.titulo} (${e.ancla})`);
     });
 
+    // Historical context per verse/anchor (new v18 enrichment)
+    Object.entries(vrContextos).slice(-12).forEach(([ck, c]) => {
+      push(`CONTEXTO HISTÓRICO [${c.ref || ck}] ${String(c.texto || "").slice(0, 160)}`);
+    });
+
     return partes;
   };
 
@@ -654,6 +669,43 @@ export default function Abigail() {
     return `El lector estudia ${refDe(sel)}, cuyo texto de trabajo dice: "${v ? v.t : ""}". ` +
       (frag ? `Marcó como ancla la expresión «${frag}».` : "El ancla es el versículo completo.");
   };
+
+  // ---- Contexto histórico dedicado por versículo o ancla (palabra/frase) ----
+  const versiculoDeClave = (k) => {
+    const [pid, nStr] = k.split(":");
+    const p = pasajes[pid] || PASAJES[pid];
+    if (!p) return null;
+    const n = parseInt(nStr, 10);
+    return p.versiculos.find((vv) => vv.n === n) || null;
+  };
+
+  const cargarContextoHistorico = async (k, ancla = null) => {
+    const v = versiculoDeClave(k);
+    if (!v) { setCtxError("No se encontró el texto del versículo"); return; }
+    const frag = ancla ? fragmento(k, ancla) : null;
+    const textoTrabajo = frag ? frag : v.t;
+
+    setCtxCargando(true); setCtxError("");
+    try {
+      const sys = "Eres un historiador bíblico riguroso y neutral. Tu tarea es proporcionar SOLO hechos históricos, culturales, geográficos, políticos y costumbristas verificables del mundo bíblico (siglo I o contexto del AT según corresponda) para el versículo o expresión exacta que se te da. No hagas exégesis teológica, no moralices, no des aplicaciones. Indica cuando algo es reconstrucción probable o conjetura académica. Cita brevemente fuentes o periodos (ej: 'judaísmo del Segundo Templo', 'prefectura romana de Judea', 'Herodes Antipas', etc.). Responde en español claro y denso.";
+      const usr = `Versículo: ${refDe(k)}\nTexto: "${textoTrabajo}"\n\nProporciona un párrafo compacto (80-140 palabras) de contexto histórico/cultural específico para este texto. Enfócate en: época, lugar, costumbres judías o romanas relevantes, instituciones, expectativas, geografía o práctica que ilumine directamente estas palabras. Si la expresión es un ancla, céntrate en ella.`;
+
+      const txt = await llamarIA([{ role: "system", content: sys }, { role: "user", content: usr }], iaConf.activo, false);
+      const ck = ctxKey(k, ancla);
+      const nuevo = {
+        texto: txt.trim(),
+        actualizado: new Date().toISOString(),
+        ref: refDe(k) + (frag ? ` «${frag}»` : "")
+      };
+      setVrContextos({ ...vrContextos, [ck]: nuevo });
+      setCtxError("");
+    } catch (e) {
+      setCtxError(e.message || "No pude obtener contexto histórico");
+    }
+    setCtxCargando(false);
+  };
+
+  const contextoDe = (k, ancla = null) => vrContextos[ctxKey(k, ancla)] || null;
 
   const sugerirConcordancias = async () => {
     const lista = proveedoresListos();
@@ -834,7 +886,7 @@ REQUISITOS DE CALIDAD:
   const exportarEstudio = () => {
     const propios = {};
     Object.entries(pasajes).forEach(([id, p]) => { if (!PASAJES[id]) propios[id] = p; });
-    const datos = { app: "abigail", version: 14, exportado: new Date().toISOString(), cadenas, resaltados, notas, pasajes: propios, estudios: estudios.filter((e) => e.propio), cerebro };
+    const datos = { app: "abigail", version: 18, exportado: new Date().toISOString(), cadenas, resaltados, notas, pasajes: propios, estudios: estudios.filter((e) => e.propio), cerebro, vrContextos };
     const blob = new Blob([JSON.stringify(datos, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -855,6 +907,7 @@ REQUISITOS DE CALIDAD:
         if (d.pasajes) setPasajes((prev) => ({ ...prev, ...d.pasajes }));
         if (d.estudios) setEstudios((prev) => [...prev.filter((e) => !d.estudios.some((x) => x.id === e.id)), ...d.estudios]);
         if (d.cerebro && d.cerebro.sintesis) setCerebro(d.cerebro);
+        if (d.vrContextos) setVrContextos((prev) => ({ ...prev, ...d.vrContextos }));
       } catch (err) {}
     };
     r.readAsText(f);
@@ -1350,6 +1403,44 @@ REQUISITOS DE CALIDAD:
                       </button>
                     </>
                   )}
+
+                  {/* === CONTEXTO HISTÓRICO POR VERSÍCULO / ANCLA === */}
+                  <div className="mt-4 pt-3" style={{ borderTop: `1px solid ${C.papelBorde}` }}>
+                    <div style={{ fontSize: 9.5, letterSpacing: "0.2em", color: C.tintaSuave, fontWeight: 700, marginBottom: 4 }}>
+                      CONTEXTO HISTÓRICO · {anclaSel ? "ancla seleccionada" : "versículo completo"}
+                    </div>
+
+                    {(() => {
+                      const ck = ctxKey(sel, anclaSel);
+                      const c = vrContextos[ck];
+                      return c ? (
+                        <div className="px-3 py-2 rounded-md mb-2" style={{ background: "#FFFBF0", borderLeft: `3px solid ${C.oro}` }}>
+                          <div style={{ fontSize: 10, color: C.tintaSuave, marginBottom: 2 }}>{c.ref}</div>
+                          <div style={{ fontFamily: "Georgia, serif", fontSize: 13.5, lineHeight: 1.6 }}>{c.texto}</div>
+                          <div style={{ fontSize: 9, color: C.tintaSuave, marginTop: 4 }}>
+                            {new Date(c.actualizado).toLocaleDateString()}
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 12.5, color: C.tintaSuave, marginBottom: 6 }}>
+                          Sin contexto histórico guardado todavía.
+                        </div>
+                      );
+                    })()}
+
+                    <button
+                      onClick={() => cargarContextoHistorico(sel, anclaSel)}
+                      disabled={ctxCargando}
+                      className="w-full py-2 rounded-full"
+                      style={{ background: C.noche, color: C.oroClaro, fontSize: 12.5, fontWeight: 700, opacity: ctxCargando ? 0.6 : 1 }}
+                    >
+                      {ctxCargando ? "Buscando contexto…" : "✦ Cargar / Actualizar contexto histórico"}
+                    </button>
+                    {ctxError && <div style={{ fontSize: 11, color: "#8A3030", marginTop: 4, fontWeight: 700 }}>{ctxError}</div>}
+                    <div style={{ fontSize: 10, color: C.tintaSuave, lineHeight: 1.4, marginTop: 4 }}>
+                      Hechos históricos, costumbres, geografía y trasfondo del mundo bíblico (siglo I o AT). Se guarda por versículo o por ancla de palabras.
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
