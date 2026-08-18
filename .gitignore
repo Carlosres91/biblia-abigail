@@ -22,3 +22,5 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+abigail/test-config.local.js
+src/lib/test-keys.js

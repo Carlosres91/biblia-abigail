@@ -1,4 +1,13 @@
 import { useState, useRef, useEffect } from "react";
+import {
+  C, TIPOS, LIBROS, PASAJES, VOLADAS, LONG_PRESS_MS, FORM_VACIO,
+  tok, limpia, normalizaLibro,
+  clave, aKey, ctxKey, refDe, versiculoDe, versiculoDeClave, fragmento, fragDestino,
+  parsearVersiculos, parsearJSONSeguro,
+  salientesDe, entrantesDe, estudiosDe, colorPalabra, notasDelVersiculo,
+  conviccionesLector, materialCerebro, materialSignature,
+} from "./lib/core.js";
+import { getTestKey } from "./lib/test-keys.js";
 
 // ============================================================
 // ABIGAIL · אביגיל — Prototipo v18 (laboratorio)
@@ -11,141 +20,6 @@ import { useState, useRef, useEffect } from "react";
 // - Todo es especificación viva para la app Android real (no se pierde nada).
 // El porqué del lector y el discernimiento siguen siendo el corazón.
 // ============================================================
-
-const C = {
-  noche: "#241B36",
-  nocheAlta: "#32264C",
-  purpura: "#3A2C55",
-  oro: "#C9A227",
-  oroClaro: "#E3C567",
-  papel: "#F7F1E3",
-  papelBorde: "#E2D6BC",
-  tinta: "#2C2338",
-  tintaSuave: "#6B6076",
-  claro: "#F1E9DA",
-  claroSuave: "#BFB3D0",
-  ambar: "#F3E2AC",
-  lila: "#E4D9F2",
-};
-
-const TIPOS = {
-  Profecía: { bg: "#F0E3BC", fg: "#7A5E10" },
-  Cumplimiento: { bg: "#DFE7C8", fg: "#4C5E1E" },
-  Paralelo: { bg: "#D8DEEE", fg: "#33406B" },
-  Contexto: { bg: "#EADCCB", fg: "#6E4E2A" },
-  Explicación: { bg: "#E4D8EC", fg: "#5A3A78" },
-};
-
-const LIBROS = [
-  "Génesis","Éxodo","Levítico","Números","Deuteronomio","Josué","Jueces","Rut",
-  "1 Samuel","2 Samuel","1 Reyes","2 Reyes","1 Crónicas","2 Crónicas","Esdras","Nehemías",
-  "Ester","Job","Salmos","Proverbios","Eclesiastés","Cantares","Isaías","Jeremías",
-  "Lamentaciones","Ezequiel","Daniel","Oseas","Joel","Amós","Abdías","Jonás","Miqueas",
-  "Nahúm","Habacuc","Sofonías","Hageo","Zacarías","Malaquías",
-  "Mateo","Marcos","Lucas","Juan","Hechos","Romanos","1 Corintios","2 Corintios",
-  "Gálatas","Efesios","Filipenses","Colosenses","1 Tesalonicenses","2 Tesalonicenses",
-  "1 Timoteo","2 Timoteo","Tito","Filemón","Hebreos","Santiago","1 Pedro","2 Pedro",
-  "1 Juan","2 Juan","3 Juan","Judas","Apocalipsis",
-];
-
-// -------------------- PASAJES (texto de muestra, parafraseado) --------------------
-const PASAJES = {
-  mr9: {
-    id: "mr9",
-    titulo: "San Marcos 9",
-    corto: "Marcos 9",
-    libro: "Marcos",
-    cap: 9,
-    seccion: "La transfiguración",
-    versiculos: [
-      { n: 2, t: "Seis días después, Jesús tomó consigo a Pedro, a Jacobo y a Juan, los llevó aparte a un monte alto, y delante de ellos fue transformada su apariencia." },
-      { n: 3, t: "Sus vestiduras se volvieron resplandecientes, de una blancura que ningún lavador en la tierra podría igualar." },
-      { n: 4, t: "Y se les aparecieron Elías y Moisés, que conversaban con Jesús." },
-      { n: 5, t: "Entonces Pedro le dijo: Maestro, qué bueno es estar aquí; levantemos tres enramadas, una para ti, otra para Moisés y otra para Elías." },
-      { n: 6, t: "No sabía qué decir, porque el temor los había sobrecogido." },
-      { n: 7, t: "Vino una nube que los cubrió con su sombra, y desde la nube una voz declaró que Jesús es el Hijo amado, y mandó oírle a él." },
-      { n: 8, t: "De pronto, al mirar alrededor, ya no vieron a nadie con ellos, sino a Jesús solo." },
-      { n: 9, t: "Mientras bajaban del monte, les ordenó no contar a nadie lo visto, hasta que el Hijo del Hombre resucitara de entre los muertos." },
-      { n: 10, t: "Ellos guardaron aquello entre sí, discutiendo qué significaría eso de resucitar de los muertos." },
-      { n: 11, t: "Y le preguntaron: ¿Por qué dicen los escribas que primero debe venir Elías?" },
-      { n: 12, t: "Él respondió: Elías en verdad viene primero y lo restaura todo. ¿Y cómo está escrito del Hijo del Hombre? Que debe padecer mucho y ser tenido en nada." },
-      { n: 13, t: "Pero les digo que Elías ya vino, e hicieron con él cuanto quisieron, tal como está escrito de él." },
-    ],
-  },
-  mal4: {
-    id: "mal4",
-    titulo: "Malaquías 4",
-    corto: "Malaquías 4",
-    libro: "Malaquías",
-    cap: 4,
-    seccion: "El envío de Elías",
-    versiculos: [
-      { n: 5, t: "Miren: yo les envío al profeta Elías antes de que venga el día grande y temible de Jehová." },
-      { n: 6, t: "Él volverá el corazón de los padres hacia los hijos, y el de los hijos hacia los padres, para que la tierra no sea herida con maldición." },
-    ],
-  },
-  // === Texto real agregado en v17 (RVR1960 adaptado para demo/personal) ===
-  jn1: {
-    id: "jn1",
-    titulo: "San Juan 1",
-    corto: "Juan 1",
-    libro: "Juan",
-    cap: 1,
-    seccion: "El Verbo hecho carne",
-    versiculos: [
-      { n: 1, t: "En el principio era el Verbo, y el Verbo era con Dios, y el Verbo era Dios." },
-      { n: 2, t: "Este era en el principio con Dios." },
-      { n: 3, t: "Todas las cosas por él fueron hechas, y sin él nada de lo que ha sido hecho fue hecho." },
-      { n: 4, t: "En él estaba la vida, y la vida era la luz de los hombres." },
-      { n: 5, t: "La luz en las tinieblas resplandece, y las tinieblas no prevalecieron contra ella." },
-      { n: 14, t: "Y aquel Verbo fue hecho carne, y habitó entre nosotros (y vimos su gloria, gloria como del unigénito del Padre), lleno de gracia y de verdad." },
-    ],
-  },
-  rm8: {
-    id: "rm8",
-    titulo: "Romanos 8",
-    corto: "Romanos 8",
-    libro: "Romanos",
-    cap: 8,
-    seccion: "Vida en el Espíritu",
-    versiculos: [
-      { n: 1, t: "Ahora, pues, ninguna condenación hay para los que están en Cristo Jesús, los que no andan conforme a la carne, sino conforme al Espíritu." },
-      { n: 2, t: "Porque la ley del Espíritu de vida en Cristo Jesús me ha librado de la ley del pecado y de la muerte." },
-      { n: 28, t: "Y sabemos que a los que aman a Dios, todas las cosas les ayudan a bien, esto es, a los que conforme a su propósito son llamados." },
-      { n: 38, t: "Por lo cual estoy seguro de que ni la muerte, ni la vida, ni ángeles, ni principados, ni potestades, ni lo presente, ni lo por venir," },
-      { n: 39, t: "ni lo alto, ni lo profundo, ni ninguna otra cosa creada nos podrá separar del amor de Dios, que es en Cristo Jesús Señor nuestro." },
-    ],
-  },
-  sal23: {
-    id: "sal23",
-    titulo: "Salmos 23",
-    corto: "Salmos 23",
-    libro: "Salmos",
-    cap: 23,
-    seccion: "El Señor es mi pastor",
-    versiculos: [
-      { n: 1, t: "Jehová es mi pastor; nada me faltará." },
-      { n: 2, t: "En lugares de delicados pastos me hará descansar; junto a aguas de reposo me pastoreará." },
-      { n: 3, t: "Confortará mi alma; me guiará por sendas de justicia por amor de su nombre." },
-      { n: 4, t: "Aunque ande en valle de sombra de muerte, no temeré mal alguno, porque tú estarás conmigo; tu vara y tu cayado me infundirán aliento." },
-      { n: 6, t: "Ciertamente el bien y la misericordia me seguirán todos los días de mi vida, y en la casa de Jehová moraré por largos días." },
-    ],
-  },
-  mt5: {
-    id: "mt5",
-    titulo: "San Mateo 5",
-    corto: "Mateo 5",
-    libro: "Mateo",
-    cap: 5,
-    seccion: "El Sermón del Monte",
-    versiculos: [
-      { n: 3, t: "Bienaventurados los pobres en espíritu, porque de ellos es el reino de los cielos." },
-      { n: 6, t: "Bienaventurados los que tienen hambre y sed de justicia, porque ellos serán saciados." },
-      { n: 14, t: "Vosotros sois la luz del mundo; una ciudad asentada sobre un monte no se puede esconder." },
-      { n: 16, t: "Así alumbre vuestra luz delante de los hombres, para que vean vuestras buenas obras, y glorifiquen a vuestro Padre que está en los cielos." },
-    ],
-  },
-};
 
 // -------------------- ESTUDIO ANCLADO --------------------
 const ESTUDIOS = [
@@ -231,12 +105,6 @@ const NOTAS_INICIALES = {
   "mr9:5": "Pedro quiere igualarlos: tres enramadas. La nube lo interrumpe — solo el Hijo.",
 };
 
-const VOLADAS = "abcdefghijklmn";
-const tok = (t) => t.split(" ");
-const limpia = (w) => w.replace(/[.,;:!?¿¡«»()"'—]/g, "");
-const LONG_PRESS_MS = 450;
-const FORM_VACIO = { libro: "", cap: "", vini: "", vfin: "", tipo: "Paralelo", porque: "", fraseDestino: "" };
-
 // ---- almacenamiento local seguro (funciona en el teléfono; si el
 // entorno lo bloquea, p. ej. una vista previa, sigue en memoria) ----
 const almacen = (() => {
@@ -252,7 +120,7 @@ const guardarLocal = (k, v) => { if (almacen) { try { almacen.setItem(k, JSON.st
 // ---- proveedores de IA (todos hablan el formato compatible OpenAI) ----
 const PROVEEDORES = {
   gemini: { nombre: "Google Gemini", url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", modelo: "gemini-3.6-flash", key: true },
-  groq: { nombre: "Groq", url: "https://api.groq.com/openai/v1/chat/completions", modelo: "openai/gpt-oss-120b", key: true },
+  groq: { nombre: "Groq", url: "https://api.groq.com/openai/v1/chat/completions", modelo: "qwen/qwen3.6-27b", key: true },
   deepseek: { nombre: "DeepSeek", url: "https://api.deepseek.com/v1/chat/completions", modelo: "deepseek-chat", key: true },
   local: { nombre: "Local (Ollama)", url: "http://localhost:11434/v1/chat/completions", modelo: "llama3.2", key: false },
   otro: { nombre: "Otro (compatible OpenAI)", url: "", modelo: "", key: true },
@@ -285,7 +153,14 @@ export default function Abigail() {
   const [anError, setAnError] = useState("");
   const [anDatos, setAnDatos] = useState(null);
   const [anResp, setAnResp] = useState({});
-  const [iaConf, setIaConf] = useState(() => cargar("abigail.ia", IA_CONF_DEF));
+  const [iaConf, setIaConf] = useState(() => {
+    const saved = cargar("abigail.ia", IA_CONF_DEF);
+    // Si no hay claves guardadas, usar claves de prueba (TEMPORAL)
+    const claves = { ...(saved.claves || {}) };
+    if (!claves.groq && getTestKey("groq")) claves.groq = getTestKey("groq");
+    if (!claves.gemini && getTestKey("gemini")) claves.gemini = getTestKey("gemini");
+    return { ...saved, claves };
+  });
   const [ajustesIAAbierto, setAjustesIAAbierto] = useState(false);
   const [iaCargando, setIaCargando] = useState(false);
   const [iaError, setIaError] = useState("");
@@ -323,18 +198,6 @@ export default function Abigail() {
   useEffect(() => { guardarLocal("abigail.vrContextos", vrContextos); }, [vrContextos]);
 
   const pasaje = pasajes[pasajeId] || PASAJES.mr9;
-  const clave = (pid, n) => `${pid}:${n}`;
-
-  // Clave para contexto histórico: versículo completo o anclado a rango de palabras
-  const ctxKey = (k, ancla) => ancla && ancla.ini != null ? `${k}@${ancla.ini}-${ancla.fin}` : k;
-  const refDe = (k) => { if (!k) return ""; const [pid, n] = k.split(":"); const p = pasajes[pid]; return p ? `${p.corto}:${n}` : k; };
-  const versiculoDe = (k) => { const [pid, n] = k.split(":"); const p = pasajes[pid]; return p ? p.versiculos.find((v) => v.n === +n) : null; };
-  const aKey = (k, a) => (a ? `${k}@${a.ini}-${a.fin}` : k);
-  const fragmento = (k, a) => {
-    const v = versiculoDe(k); if (!v || !a) return null;
-    return tok(v.t).slice(a.ini, a.fin + 1).map((w, i, arr) => (i === arr.length - 1 ? limpia(w) : w)).join(" ");
-  };
-  const fragDestino = (c) => (c.hastaClave && c.hastaAncla ? fragmento(c.hastaClave, c.hastaAncla) : (c.hastaFragTexto || null));
 
   // pasaje destino cargado según el formulario (libro + capítulo + versículo)
   const destinoCargado = () => {
@@ -342,16 +205,6 @@ export default function Abigail() {
     if (!p) return null;
     const v = p.versiculos.find((v) => v.n === +form.vini);
     return v ? { p, v, k: clave(p.id, v.n) } : null;
-  };
-
-  const salientesDe = (k) => cadenas.filter((c) => c.desdeClave === k).sort((x, y) => (x.desdeAncla ? x.desdeAncla.fin : 999) - (y.desdeAncla ? y.desdeAncla.fin : 999) || x.id - y.id);
-  const entrantesDe = (k) => cadenas.filter((c) => c.hastaClave === k);
-  const estudiosDe = (k) => estudios.filter((e) => e.versiculos.includes(k));
-
-  const colorPalabra = (k, i) => {
-    const segs = resaltados[k] || [];
-    const s = segs.find((s) => (s.ini == null ? true : i >= s.ini && i <= s.fin));
-    return s ? s.color : null;
   };
 
   const abrirVersiculo = (k) => {
@@ -432,28 +285,6 @@ export default function Abigail() {
   };
 
   // ---- cargador de pasajes: parte el texto pegado en versículos ----
-  const parsearVersiculos = (texto) => {
-    const uno = " " + texto.replace(/\r/g, " ").replace(/\n+/g, " ").replace(/\s+/g, " ").trim();
-    let partes = uno.split(/\s(\d{1,3})[\s.):]+/);
-    let vs = [];
-    for (let i = 1; i < partes.length; i += 2) {
-      const n = parseInt(partes[i], 10);
-      const cuerpo = (partes[i + 1] || "").trim();
-      if (n > 0 && n < 200 && cuerpo) vs.push({ n, t: cuerpo });
-    }
-    if (vs.length <= 1) {
-      // formato "pegado": 16Porque de tal manera…
-      partes = uno.split(/(\d{1,3})(?=[A-ZÁÉÍÓÚÑ¿¡«"'])/);
-      vs = [];
-      for (let i = 1; i < partes.length; i += 2) {
-        const n = parseInt(partes[i], 10);
-        const cuerpo = (partes[i + 1] || "").trim();
-        if (n > 0 && n < 200 && cuerpo) vs.push({ n, t: cuerpo });
-      }
-    }
-    return vs;
-  };
-
   const vistaPreviaCarga = cargadorAbierto ? parsearVersiculos(cargForm.texto) : [];
 
   const guardarPasaje = () => {
@@ -506,114 +337,10 @@ export default function Abigail() {
     return ((iaConf.claves || {})[id] || "").trim() !== "";
   });
 
-  // reparador: extrae el JSON de la respuesta y endereza errores comunes
-  const parsearJSONSeguro = (txt) => {
-    let t = String(txt).replace(/```json|```/g, "").trim();
-    const iObj = t.indexOf("{"), iArr = t.indexOf("[");
-    let abre = "{", cierra = "}";
-    if (iArr >= 0 && (iObj < 0 || iArr < iObj)) { abre = "["; cierra = "]"; }
-    const ini = t.indexOf(abre), fin = t.lastIndexOf(cierra);
-    if (ini < 0 || fin < 0) throw new Error("El consejero no devolvió JSON — intenta de nuevo");
-    let s = t.slice(ini, fin + 1);
-    const arreglos = [
-      (x) => x,
-      (x) => x.replace(/[\r\n\t]+/g, " "),
-      (x) => x.replace(/[""«»]/g, "'").replace(/[\u2018\u2019]/g, "'"),
-      (x) => x.replace(/,\s*([}\]])/g, "$1"),
-    ];
-    for (const f of arreglos) {
-      s = f(s);
-      try { return JSON.parse(s); } catch (e) {}
-    }
-    throw new Error("El consejero devolvió un formato torcido — repite el intento o cambia de proveedor en ✦ IA");
-  };
-
-  // ---- memoria de discernimiento: las convicciones ya respondidas por el lector ----
-  const conviccionesLector = () => {
-    const lista = [];
-    estudios.filter((e) => e.propio).forEach((e) => {
-      (e.discernimiento || []).forEach((d) => {
-        if ((d.respuesta || "").trim()) lista.push({ ancla: e.ancla, pregunta: String(d.pregunta).slice(0, 120), respuesta: String(d.respuesta).trim().slice(0, 200) });
-      });
-    });
-    return lista.slice(-12);
-  };
-
-  // ---- el Cerebro de Abigail: todo el estudio del lector, destilado (v18 pulido) ----
-  const materialCerebro = () => {
-    const partes = [];
-    const MAX = 4200;
-    let chars = 0;
-
-    const push = (s) => {
-      if (chars + s.length > MAX) return false;
-      partes.push(s);
-      chars += s.length + 1;
-      return true;
-    };
-
-    // Convictions (the reader's actual decisions — highest value)
-    estudios.filter((e) => e.propio).forEach((e) => {
-      (e.discernimiento || []).forEach((d) => {
-        const r = (d.respuesta || "").trim();
-        if (r) {
-          push(`CONVICCIÓN [${e.ancla}] ${String(d.pregunta).slice(0,110)} → ${r.slice(0,180)}`);
-        }
-      });
-      if (e.parrafos && e.parrafos.length) {
-        const head = e.parrafos.slice(0, 2).map(p => p.slice(0, 160)).join(" | ");
-        push(`ESTUDIO [${e.ancla}] ${e.titulo}: ${head}`);
-      }
-    });
-
-    // Chains — core intertextual memory of the reader
-    cadenas.forEach((c) => {
-      if (c.porque) {
-        const tipo = c.tipo ? ` (${c.tipo})` : "";
-        const ia = c.sugeridaIA ? " [aceptada de IA]" : "";
-        push(`CADENA${ia}${tipo} ${refDe(c.desdeClave)} ⟶ ${c.hastaRef}: ${String(c.porque).slice(0,140)}`);
-      }
-    });
-
-    // Notes
-    Object.entries(notas).forEach(([k, t]) => {
-      push(`NOTA [${refDe(k.split("@")[0])}] ${String(t).slice(0,120)}`);
-    });
-
-    // Custom passages being read
-    Object.values(pasajes).forEach((p) => {
-      if (!PASAJES[p.id]) push(`LEYENDO: ${p.titulo}`);
-    });
-
-    // Recent study titles
-    estudios.filter((e) => e.propio).slice(-6).forEach((e) => {
-      push(`TÍTULO ESTUDIO: ${e.titulo} (${e.ancla})`);
-    });
-
-    // Historical context per verse/anchor (new v18 enrichment)
-    Object.entries(vrContextos).slice(-12).forEach(([ck, c]) => {
-      push(`CONTEXTO HISTÓRICO [${c.ref || ck}] ${String(c.texto || "").slice(0, 160)}`);
-    });
-
-    return partes;
-  };
-
-  // Firma ligera para detectar material nuevo sin sintetizar (más confiable que longitud cruda)
-  const materialSignature = () => {
-    let conv = 0, cad = 0, not = 0, est = 0;
-    estudios.filter((e) => e.propio).forEach((e) => {
-      (e.discernimiento || []).forEach((d) => { if ((d.respuesta || "").trim()) conv++; });
-      if (e.parrafos && e.parrafos.length) est++;
-    });
-    cadenas.forEach((c) => { if (c.porque) cad++; });
-    Object.keys(notas).forEach(() => not++);
-    return { conv, cad, not, est, total: conv + cad + not + est };
-  };
-
   const actualizarCerebro = async () => {
     setCerebroMsg("… sintetizando todo tu estudio");
     try {
-      const material = materialCerebro();
+      const material = materialCerebro({ pasajes, estudios, cadenas, notas, vrContextos });
       if (material.length === 0) { setCerebroMsg("Aún no hay material — estudia un poco primero"); return; }
       const sys = "Eres el archivista fiel de un estudioso serio de la Biblia Reina-Valera 1960. Tu única fuente es el material que te entrego. No inventes, no añadas doctrina, no moralices. Destila un perfil preciso y útil que otras IAs puedan usar después como contexto fiel. Prioriza: (1) convicciones reales ya respondidas por el lector con sus anclas, (2) temas teológicos e históricos que aparecen repetidamente, (3) conexiones intertextuales explícitas que el lector ha hecho (cadenas), (4) patrones de cómo razona y qué preguntas ya ha cerrado. Sé compacto, concreto y fiel. Incluye referencias bíblicas cuando aparezcan. Responde ÚNICAMENTE JSON válido.";
       const usr = 'MATERIAL DEL LECTOR:\n"""' + material.join("\n") + '"""\n\nProduce exactamente este JSON:\n{"sintesis":"Texto compacto máximo 260 palabras. Estructura natural: Convicciones centrales (con anclas), Temas que más estudia (histórico/teológico), Cómo conecta pasajes (cadenas clave), Preguntas ya resueltas. Usa referencias concretas del material. No repitas el material crudo."}';
@@ -633,7 +360,7 @@ export default function Abigail() {
     (async () => {
       autoCerebroEnCurso.current = true;
       try {
-        const material = materialCerebro();
+        const material = materialCerebro({ pasajes, estudios, cadenas, notas, vrContextos });
         if (material.length === 0) { autoCerebroEnCurso.current = false; return; }
         const sys = "Eres el archivista fiel de un estudioso serio de la Biblia Reina-Valera 1960. Sintetiza SOLO con el material. Compacto (≤250 palabras). JSON únicamente.";
         const usr = 'MATERIAL:\n"""' + material.join("\n") + '"""\nProduce: {"sintesis":"perfil compacto y fiel con convicciones, temas y cadenas"}';
@@ -656,7 +383,7 @@ export default function Abigail() {
     if (cerebro.sintesis) {
       trozos.push(" [CEREBRO DE ABIGAIL — memoria fiel de todo tu estudio. Respétalo estrictamente: no repitas lo ya resuelto ni contradigas las convicciones que el lector ya formó. Construye sobre esto, avanza. Síntesis: " + cerebro.sintesis + " ]");
     }
-    const frescas = conviccionesLector().slice(-6);
+    const frescas = conviccionesLector(estudios).slice(-6);
     if (frescas.length > 0) {
       trozos.push(" [ÚLTIMAS CONVICCIONES DEL LECTOR — ya discernidas y respondidas; no preguntes lo mismo otra vez: " + frescas.map((c) => `[${c.ancla}] ${c.pregunta} → ${c.respuesta}`).join(" · ") + " ]");
     }
@@ -664,38 +391,31 @@ export default function Abigail() {
   };
 
   const contextoAncla = () => {
-    const v = versiculoDe(sel);
-    const frag = anclaSel ? fragmento(sel, anclaSel) : null;
-    return `El lector estudia ${refDe(sel)}, cuyo texto de trabajo dice: "${v ? v.t : ""}". ` +
+    const v = versiculoDe(sel, pasajes);
+    const frag = anclaSel ? fragmento(sel, anclaSel, pasajes) : null;
+    return `El lector estudia ${refDe(sel, pasajes)}, cuyo texto de trabajo dice: "${v ? v.t : ""}". ` +
       (frag ? `Marcó como ancla la expresión «${frag}».` : "El ancla es el versículo completo.");
   };
 
   // ---- Contexto histórico dedicado por versículo o ancla (palabra/frase) ----
-  const versiculoDeClave = (k) => {
-    const [pid, nStr] = k.split(":");
-    const p = pasajes[pid] || PASAJES[pid];
-    if (!p) return null;
-    const n = parseInt(nStr, 10);
-    return p.versiculos.find((vv) => vv.n === n) || null;
-  };
 
   const cargarContextoHistorico = async (k, ancla = null) => {
-    const v = versiculoDeClave(k);
+    const v = versiculoDeClave(k, pasajes);
     if (!v) { setCtxError("No se encontró el texto del versículo"); return; }
-    const frag = ancla ? fragmento(k, ancla) : null;
+    const frag = ancla ? fragmento(k, ancla, pasajes) : null;
     const textoTrabajo = frag ? frag : v.t;
 
     setCtxCargando(true); setCtxError("");
     try {
       const sys = "Eres un historiador bíblico riguroso y neutral. Tu tarea es proporcionar SOLO hechos históricos, culturales, geográficos, políticos y costumbristas verificables del mundo bíblico (siglo I o contexto del AT según corresponda) para el versículo o expresión exacta que se te da. No hagas exégesis teológica, no moralices, no des aplicaciones. Indica cuando algo es reconstrucción probable o conjetura académica. Cita brevemente fuentes o periodos (ej: 'judaísmo del Segundo Templo', 'prefectura romana de Judea', 'Herodes Antipas', etc.). Responde en español claro y denso.";
-      const usr = `Versículo: ${refDe(k)}\nTexto: "${textoTrabajo}"\n\nProporciona un párrafo compacto (80-140 palabras) de contexto histórico/cultural específico para este texto. Enfócate en: época, lugar, costumbres judías o romanas relevantes, instituciones, expectativas, geografía o práctica que ilumine directamente estas palabras. Si la expresión es un ancla, céntrate en ella.`;
+      const usr = `Versículo: ${refDe(k, pasajes)}\nTexto: "${textoTrabajo}"\n\nProporciona un párrafo compacto (80-140 palabras) de contexto histórico/cultural específico para este texto. Enfócate en: época, lugar, costumbres judías o romanas relevantes, instituciones, expectativas, geografía o práctica que ilumine directamente estas palabras. Si la expresión es un ancla, céntrate en ella.`;
 
       const txt = await llamarIA([{ role: "system", content: sys }, { role: "user", content: usr }], iaConf.activo, false);
       const ck = ctxKey(k, ancla);
       const nuevo = {
         texto: txt.trim(),
         actualizado: new Date().toISOString(),
-        ref: refDe(k) + (frag ? ` «${frag}»` : "")
+        ref: refDe(k, pasajes) + (frag ? ` «${frag}»` : "")
       };
       setVrContextos({ ...vrContextos, [ck]: nuevo });
       setCtxError("");
@@ -756,7 +476,6 @@ export default function Abigail() {
     setIaCargando(false);
   };
 
-  const normalizaLibro = (s) => String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
   const aceptarSugerencia = (s) => {
     const m = String(s.referencia).match(/^\s*([123]?\s?[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+(?:\s[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+)*)\s+(\d+)[:.](\d+)/);
     let hastaClave = null;
@@ -914,14 +633,72 @@ REQUISITOS DE CALIDAD:
     e.target.value = "";
   };
 
-  const notasDelVersiculo = (k) => Object.entries(notas)
-    .filter(([nk]) => nk === k || nk.startsWith(k + "@"))
-    .map(([nk, texto]) => {
-      const m = nk.match(/@(\d+)-(\d+)$/);
-      return { ancla: m ? { ini: +m[1], fin: +m[2] } : null, texto };
-    });
 
   const dest = destinoCargado();
+
+  // -------------------- PUENTE PARA TESTS FUNCIONALES --------------------
+  // Solo se activa cuando la URL lleva ?test=1. Permite a un harness externo
+  // inspeccionar estado y disparar acciones sin depender de clics simulados.
+  const isTestMode = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("test");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!isTestMode) return;
+    window.__ABIGAIL_TEST__ = {
+      version: 18,
+      getState: () => ({
+        pasajeId, vista, sel, anclaSel, anclaDestino, modo,
+        cadenas: [...cadenas], notas: { ...notas }, resaltados: { ...resaltados },
+        cerebro: { ...cerebro }, vrContextos: { ...vrContextos },
+        iaConf: { ...iaConf }, pasajes: { ...pasajes }, estudios: [...estudios],
+        analisisAbierto, cargadorAbierto, selectorAbierto
+      }),
+      getPasaje: () => pasaje,
+      getCadenas: () => [...cadenas],
+      getNotas: () => ({ ...notas }),
+      getCerebro: () => ({ ...cerebro }),
+      getVrContextos: () => ({ ...vrContextos }),
+      seleccionarPasaje: (id) => setPasajeId(id),
+      irA: (k, a) => irA(k, a),
+      abrirVersiculo: (k) => abrirVersiculo(k),
+      setAncla: (a) => setAnclaSel(a),
+      setModo: (m) => setModo(m),
+      guardarCadena: (c) => {
+        setCadenas((prev) => [...prev, { id: Date.now(), ...c }]);
+      },
+      guardarNota: (k, a, texto) => {
+        const nk = aKey(k, a);
+        const nx = { ...notas };
+        if (texto && texto.trim()) nx[nk] = texto.trim(); else delete nx[nk];
+        setNotas(nx);
+      },
+      guardarContexto: (k, ancla, texto) => {
+        const ck = ctxKey(k, ancla);
+        setVrContextos((prev) => ({ ...prev, [ck]: { texto, ref: refDe(k, pasajes), actualizado: new Date().toISOString() } }));
+      },
+      setCerebro: (c) => setCerebro(c),
+      exportarEstudio,
+      importarEstudio,
+      parsearVersiculos,
+      parsearJSONSeguro,
+      materialCerebro: () => materialCerebro({ pasajes, estudios, cadenas, notas, vrContextos }),
+      materialSignature: () => materialSignature({ estudios, cadenas, notas }),
+      conviccionesLector: () => conviccionesLector(estudios),
+      llamarIA,
+      cargarContextoHistorico,
+      analizarPasaje,
+      sugerirConcordancias,
+      actualizarCerebro,
+      probarIA,
+      resetLocalStorage: () => {
+        Object.keys(localStorage).filter((k) => k.startsWith("abigail.")).forEach((k) => localStorage.removeItem(k));
+      },
+      dom: {
+        versiculoByKey: (k) => document.querySelector(`[data-versiculo="${k}"]`),
+        versiculoByNum: (n) => document.querySelector(`[data-versiculo="${clave(pasaje.id, n)}"]`),
+        versiculos: () => Array.from(document.querySelectorAll("[data-versiculo]")),
+      }
+    };
+  }, [isTestMode, pasajeId, vista, sel, anclaSel, anclaDestino, modo, cadenas, notas, resaltados, cerebro, vrContextos, iaConf, pasajes, estudios, analisisAbierto, cargadorAbierto, selectorAbierto]);
 
   // ---------------------------------------------------------- UI
   return (
@@ -1009,7 +786,7 @@ REQUISITOS DE CALIDAD:
                   style={{ background: C.nocheAlta, border: `1px solid ${C.purpura}`, fontSize: 11, color: C.claro }}
                 >
                   🧠 Cerebro: {cerebro.elementos} elementos
-                  {(() => { const sig = materialSignature(); const n = sig.total > cerebro.elementos ? sig.total - cerebro.elementos : 0; return n > 0 ? <span style={{ color: C.oroClaro }}> · {n} nuevos</span> : null; })()}
+                  {(() => { const sig = materialSignature({ estudios, cadenas, notas }); const n = sig.total > cerebro.elementos ? sig.total - cerebro.elementos : 0; return n > 0 ? <span style={{ color: C.oroClaro }}> · {n} nuevos</span> : null; })()}
                 </button>
                 <button
                   onClick={actualizarCerebro}
@@ -1043,13 +820,13 @@ REQUISITOS DE CALIDAD:
                 {pasaje.versiculos.map((v) => {
                   const k = clave(pasaje.id, v.n);
                   const palabras = tok(v.t);
-                  const sal = salientesDe(k);
-                  const ent = entrantesDe(k);
-                  const notasV = notasDelVersiculo(k);
+                  const sal = salientesDe(k, cadenas);
+                  const ent = entrantesDe(k, cadenas);
+                  const notasV = notasDelVersiculo(k, notas);
                   const seleccionado = sel === k;
                   const letraDe = new Map(sal.map((c, i) => [c.id, VOLADAS[i] || "•"]));
                   return (
-                    <span key={v.n} id={`v-${k}`}>
+                    <span key={v.n} id={`v-${k}`} data-versiculo={k}>
                       <span
                         onClick={() => clickVersiculo(k)}
                         onPointerDown={() => iniciarPresion(k)}
@@ -1061,7 +838,7 @@ REQUISITOS DE CALIDAD:
                       >
                         <sup style={{ color: C.oro, fontWeight: 700, fontSize: 11, marginRight: 3 }}>{v.n}</sup>
                         {palabras.map((w, i) => {
-                          const col = colorPalabra(k, i);
+                          const col = colorPalabra(k, i, resaltados);
                           const enAncla = seleccionado && anclaSel && i >= anclaSel.ini && i <= anclaSel.fin;
                           return (
                             <span key={i}>
@@ -1096,7 +873,7 @@ REQUISITOS DE CALIDAD:
                       {margenAbierto === k && (
                         <span style={{ display: "block", margin: "8px 0 12px 14px", paddingLeft: 12, borderLeft: `2px solid ${C.oro}` }}>
                           <span style={{ display: "block", fontSize: 9, letterSpacing: "0.2em", color: C.tintaSuave, fontFamily: "system-ui, sans-serif", marginBottom: 4 }}>
-                            CONCORDANCIA · {refDe(k)}
+                            CONCORDANCIA · {refDe(k, pasajes)}
                           </span>
                           {sal.length + ent.length === 0 && (
                             <span style={{ display: "block", fontSize: 12.5, color: C.tintaSuave }}>Sin cadenas todavía. Toca el versículo y usa ⛓ Enlazar.</span>
@@ -1113,7 +890,7 @@ REQUISITOS DE CALIDAD:
                               <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", color: (TIPOS[c.tipo] || TIPOS.Paralelo).fg, fontFamily: "system-ui, sans-serif" }}>
                                 {c.tipo.toUpperCase()}
                               </span>
-                              {c.desdeAncla && <span style={{ color: C.tintaSuave, fontSize: 11 }}> · «{fragmento(k, c.desdeAncla)}»</span>}
+                              {c.desdeAncla && <span style={{ color: C.tintaSuave, fontSize: 11 }}> · «{fragmento(k, c.desdeAncla, pasajes)}»</span>}
                             </span>
                           ))}
                           {ent.map((c) => (
@@ -1123,7 +900,7 @@ REQUISITOS DE CALIDAD:
                                 onClick={(e) => { e.stopPropagation(); irA(c.desdeClave, c.desdeAncla); }}
                                 style={{ fontFamily: "Georgia, serif", fontSize: 12.5, color: C.tinta, textDecoration: "underline", background: "none", border: "none", padding: 0, cursor: "pointer" }}
                               >
-                                desde {refDe(c.desdeClave)}
+                                desde {refDe(c.desdeClave, pasajes)}
                               </button>{" "}
                               <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", color: (TIPOS[c.tipo] || TIPOS.Paralelo).fg, fontFamily: "system-ui, sans-serif" }}>
                                 {c.tipo.toUpperCase()}
@@ -1171,13 +948,13 @@ REQUISITOS DE CALIDAD:
                 </label>
               </div>
               {cadenas.map((c) => {
-                const frag = fragmento(c.desdeClave, c.desdeAncla);
-                const fragHasta = fragDestino(c);
+                const frag = fragmento(c.desdeClave, c.desdeAncla, pasajes);
+                const fragHasta = fragDestino(c, pasajes);
                 return (
                   <button key={c.id} onClick={() => irA(c.desdeClave, c.desdeAncla)} className="w-full text-left mb-3 px-4 py-3 rounded-lg" style={{ background: "#FFFDF6", border: `1px solid ${C.papelBorde}` }}>
                     <div className="flex items-center justify-between gap-2">
                       <div style={{ fontFamily: "Georgia, serif", fontSize: 14, fontWeight: 700 }}>
-                        {refDe(c.desdeClave)} <span style={{ color: C.oro }}>⟶</span> {c.hastaRef}
+                        {refDe(c.desdeClave, pasajes)} <span style={{ color: C.oro }}>⟶</span> {c.hastaRef}
                       </div>
                       <Chip tipo={c.tipo} />
                     </div>
@@ -1198,19 +975,19 @@ REQUISITOS DE CALIDAD:
 
         {/* ===== SHEET DEL VERSÍCULO ===== */}
         {sel && vista === "leer" && (() => {
-          const v = versiculoDe(sel);
+          const v = versiculoDe(sel, pasajes);
           const palabras = tok(v.t);
-          const sal = salientesDe(sel);
-          const ent = entrantesDe(sel);
+          const sal = salientesDe(sel, cadenas);
+          const ent = entrantesDe(sel, cadenas);
           const letraDe = new Map(sal.map((c, i) => [c.id, VOLADAS[i] || "•"]));
-          const notasV = notasDelVersiculo(sel);
+          const notasV = notasDelVersiculo(sel, notas);
           return (
             <div className="fixed left-0 right-0 bottom-0 z-40">
               <div className="mx-auto relative" style={{ maxWidth: 480 }}>
                 <div className="absolute" style={{ top: -26, right: 28, width: 22, height: 40, background: `linear-gradient(${C.oro}, ${C.oroClaro})`, clipPath: "polygon(0 0, 100% 0, 100% 100%, 50% 82%, 0 100%)", boxShadow: "0 4px 10px rgba(0,0,0,0.35)" }} />
                 <div className="rounded-t-2xl px-5 pt-4 pb-5 overflow-y-auto" style={{ background: C.papel, color: C.tinta, maxHeight: "72vh", boxShadow: "0 -14px 40px rgba(0,0,0,0.55)", borderTop: `3px solid ${C.oro}` }}>
                   <div className="flex items-center justify-between mb-3">
-                    <div style={{ fontFamily: "Georgia, serif", fontWeight: 700, fontSize: 16 }}>{refDe(sel)}</div>
+                    <div style={{ fontFamily: "Georgia, serif", fontWeight: 700, fontSize: 16 }}>{refDe(sel, pasajes)}</div>
                     <button onClick={() => setSel(null)} aria-label="Cerrar" className="px-3 py-1 rounded-full" style={{ background: C.tinta, color: C.papel, fontSize: 12 }}>Cerrar ✕</button>
                   </div>
 
@@ -1230,7 +1007,7 @@ REQUISITOS DE CALIDAD:
                       })}
                     </div>
                     <div style={{ fontSize: 11.5, color: C.tintaSuave, marginTop: 8 }}>
-                      Ancla actual: {anclaSel ? <b style={{ color: "#7A5E10" }}>«{fragmento(sel, anclaSel)}»</b> : <b>versículo completo</b>}
+                      Ancla actual: {anclaSel ? <b style={{ color: "#7A5E10" }}>«{fragmento(sel, anclaSel, pasajes)}»</b> : <b>versículo completo</b>}
                       {anclaSel && anclaSel.ini === anclaSel.fin && <span> · toca otra palabra para extender a una frase</span>}
                     </div>
                   </div>
@@ -1251,7 +1028,7 @@ REQUISITOS DE CALIDAD:
                     <div className="mb-4 px-4 py-4 rounded-lg" style={{ background: "#FFFDF6", border: `1px dashed ${C.oro}` }}>
                       <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 2 }}>Nueva cadena</div>
                       <div style={{ fontSize: 11.5, color: C.tintaSuave, marginBottom: 10 }}>
-                        Desde: {anclaSel ? <>«{fragmento(sel, anclaSel)}»</> : "versículo completo"} ({refDe(sel)})
+                        Desde: {anclaSel ? <>«{fragmento(sel, anclaSel, pasajes)}»</> : "versículo completo"} ({refDe(sel, pasajes)})
                       </div>
 
                       <div style={{ fontSize: 10, letterSpacing: "0.15em", color: C.tintaSuave, marginBottom: 4 }}>ENLAZAR CON</div>
@@ -1280,7 +1057,7 @@ REQUISITOS DE CALIDAD:
                             })}
                           </div>
                           {anclaDestino && (
-                            <div style={{ fontSize: 11, color: "#7A5E10", marginTop: 6 }}>«{fragmento(dest.k, anclaDestino)}»</div>
+                            <div style={{ fontSize: 11, color: "#7A5E10", marginTop: 6 }}>«{fragmento(dest.k, anclaDestino, pasajes)}»</div>
                           )}
                         </div>
                       ) : (
@@ -1313,7 +1090,7 @@ REQUISITOS DE CALIDAD:
                     <div className="mb-4 px-4 py-4 rounded-lg" style={{ background: "#FFFDF6", border: `1px dashed ${C.oro}` }}>
                       <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 2 }}>Nota al margen</div>
                       <div style={{ fontSize: 11.5, color: C.tintaSuave, marginBottom: 8 }}>
-                        Sobre: {anclaSel ? <>«{fragmento(sel, anclaSel)}»</> : "el versículo completo"} ({refDe(sel)})
+                        Sobre: {anclaSel ? <>«{fragmento(sel, anclaSel, pasajes)}»</> : "el versículo completo"} ({refDe(sel, pasajes)})
                       </div>
                       <textarea value={notaBorrador} onChange={(e) => setNotaBorrador(e.target.value)} rows={3} placeholder="Tu apunte de estudio…" className="w-full px-3 py-2 rounded-md mb-2" style={{ border: `1px solid ${C.papelBorde}`, background: "#FFF", fontSize: 14 }} />
                       <button onClick={guardarNota} className="w-full py-2 rounded-full" style={{ background: C.noche, color: C.oroClaro, fontSize: 13, fontWeight: 700 }}>Guardar nota</button>
@@ -1325,7 +1102,7 @@ REQUISITOS DE CALIDAD:
                     <div className="mb-4 px-4 py-4 rounded-lg" style={{ background: "#FFFDF6", border: `1px dashed ${C.oro}` }}>
                       <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 2 }}>✦ El Consejo</div>
                       <div style={{ fontSize: 11.5, color: C.tintaSuave, marginBottom: 8 }}>
-                        Sobre: {anclaSel ? <>«{fragmento(sel, anclaSel)}»</> : "el versículo completo"} ({refDe(sel)}) · {(PROVEEDORES[iaConf.activo] || PROVEEDORES.gemini).nombre}
+                        Sobre: {anclaSel ? <>«{fragmento(sel, anclaSel, pasajes)}»</> : "el versículo completo"} ({refDe(sel, pasajes)}) · {(PROVEEDORES[iaConf.activo] || PROVEEDORES.gemini).nombre}
                       </div>
                       <button onClick={sugerirConcordancias} disabled={iaCargando} className="w-full py-2 rounded-full mb-1" style={{ background: C.noche, color: C.oroClaro, fontSize: 12.5, fontWeight: 700, opacity: iaCargando ? 0.5 : 1 }}>
                         {iaCargando ? "El comité está deliberando…" : "✦ Sugerir concordancias"}
@@ -1368,7 +1145,7 @@ REQUISITOS DE CALIDAD:
                   {modo === "cadenas" && notasV.map((n, j) => (
                     <div key={j} className="mb-3 px-4 py-3 rounded-lg" style={{ background: "#FFFDF6", borderLeft: `3px solid ${C.oro}` }}>
                       <div style={{ fontSize: 10, letterSpacing: "0.15em", color: C.tintaSuave }}>
-                        NOTA {n.ancla ? <>· «{fragmento(sel, n.ancla)}»</> : "· versículo completo"}
+                        NOTA {n.ancla ? <>· «{fragmento(sel, n.ancla, pasajes)}»</> : "· versículo completo"}
                       </div>
                       <div style={{ fontFamily: "Georgia, serif", fontStyle: "italic", fontSize: 14, marginTop: 3 }}>{n.texto}</div>
                     </div>
@@ -1382,16 +1159,16 @@ REQUISITOS DE CALIDAD:
                         </div>
                       )}
                       {sal.map((c) => (
-                        <TarjetaCadena key={c.id} letra={letraDe.get(c.id)} titulo={c.hastaRef} frag={fragmento(c.desdeClave, c.desdeAncla)} fragOtro={fragDestino(c)} c={c}
+                        <TarjetaCadena key={c.id} letra={letraDe.get(c.id)} titulo={c.hastaRef} frag={fragmento(c.desdeClave, c.desdeAncla, pasajes)} fragOtro={fragDestino(c, pasajes)} c={c}
                           onIr={c.hastaClave ? () => irA(c.hastaClave, c.hastaAncla) : null}
                           onEstudio={c.estudioId ? () => setEstudioAbierto(estudios.find((e) => e.id === c.estudioId)) : null} />
                       ))}
                       {ent.map((c) => (
-                        <TarjetaCadena key={"e" + c.id} letra="↩" titulo={<>desde <u>{refDe(c.desdeClave)}</u></>} frag={fragDestino(c)} fragOtro={fragmento(c.desdeClave, c.desdeAncla)} c={c}
+                        <TarjetaCadena key={"e" + c.id} letra="↩" titulo={<>desde <u>{refDe(c.desdeClave, pasajes)}</u></>} frag={fragDestino(c, pasajes)} fragOtro={fragmento(c.desdeClave, c.desdeAncla, pasajes)} c={c}
                           onIr={() => irA(c.desdeClave, c.desdeAncla)}
                           onEstudio={c.estudioId ? () => setEstudioAbierto(estudios.find((e) => e.id === c.estudioId)) : null} />
                       ))}
-                      {estudiosDe(sel).map((e) => (
+                      {estudiosDe(sel, estudios).map((e) => (
                         <button key={e.id} onClick={() => setEstudioAbierto(e)} className="w-full text-left px-4 py-3 rounded-lg mt-1" style={{ background: C.noche, color: C.claro }}>
                           <div style={{ fontSize: 10, letterSpacing: "0.2em", color: C.oroClaro }}>✦ ESTUDIO ANCLADO</div>
                           <div style={{ fontFamily: "Georgia, serif", fontSize: 15, marginTop: 3 }}>{e.titulo}</div>
@@ -1456,9 +1233,9 @@ REQUISITOS DE CALIDAD:
               <div style={{ fontSize: 11.5, color: C.tintaSuave, lineHeight: 1.6, marginBottom: 10 }}>
                 El análisis separa lo que el texto dice de las interpretaciones humanas. Donde las tradiciones difieren, la IA no decide: te presenta las lecturas y te pregunta — tu discernimiento es lo que queda guardado.
               </div>
-              {iaConf.usarDiscernimiento !== false && (cerebro.sintesis || conviccionesLector().length > 0) && (
+              {iaConf.usarDiscernimiento !== false && (cerebro.sintesis || conviccionesLector(estudios).length > 0) && (
                 <div style={{ fontSize: 10.5, color: "#7A5E10", fontWeight: 700, marginBottom: 8 }}>
-                  ✦ {cerebro.sintesis ? "Con el Cerebro de Abigail (síntesis de " + cerebro.elementos + " elementos)" : "Con tu discernimiento previo: " + conviccionesLector().length + " respuestas"} — no se te preguntará lo ya resuelto.
+                  ✦ {cerebro.sintesis ? "Con el Cerebro de Abigail (síntesis de " + cerebro.elementos + " elementos)" : "Con tu discernimiento previo: " + conviccionesLector(estudios).length + " respuestas"} — no se te preguntará lo ya resuelto.
                 </div>
               )}
               {!anDatos && (
@@ -1538,7 +1315,7 @@ REQUISITOS DE CALIDAD:
                 <div style={{ fontSize: 11.5, color: C.tintaSuave, lineHeight: 1.5, marginBottom: 4 }}>
                   {cerebro.sintesis
                     ? (() => {
-                        const sig = materialSignature();
+                        const sig = materialSignature({ estudios, cadenas, notas });
                         const nuevos = sig.total > cerebro.elementos ? sig.total - cerebro.elementos : 0;
                         return <>Síntesis de <b>{cerebro.elementos}</b> elementos {nuevos > 0 ? <><b style={{ color: "#7A5E10" }}>· {nuevos} nuevos sin sintetizar</b></> : <>· al día</>}</>;
                       })()
@@ -1648,7 +1425,7 @@ REQUISITOS DE CALIDAD:
               <div style={{ fontSize: 10, letterSpacing: "0.2em", color: C.tintaSuave, marginTop: 10 }}>VERSÍCULOS DE ESTA CADENA</div>
               <div className="flex flex-wrap gap-2 mt-2 mb-5">
                 {estudioAbierto.versiculos.map((k) => (
-                  <button key={k} onClick={() => irA(k)} className="px-3 py-1 rounded-full" style={{ background: C.noche, color: C.oroClaro, fontSize: 12, fontFamily: "Georgia, serif" }}>{refDe(k)}</button>
+                  <button key={k} onClick={() => irA(k)} className="px-3 py-1 rounded-full" style={{ background: C.noche, color: C.oroClaro, fontSize: 12, fontFamily: "Georgia, serif" }}>{refDe(k, pasajes)}</button>
                 ))}
               </div>
               <button onClick={() => setEstudioAbierto(null)} className="w-full py-2 rounded-full" style={{ border: `1px solid ${C.tinta}`, fontSize: 13 }}>Volver a la lectura</button>
