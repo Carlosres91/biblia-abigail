@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// Pruebas funcionales de Biblia Abigail sin navegador, usando happy-dom.
+// Pruebas funcionales de Biblia Abigail sin navegador, usando jsdom.
 // Uso: node scripts/test-functional.js
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { Window } from 'happy-dom';
+import { JSDOM, VirtualConsole } from 'jsdom';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
@@ -13,19 +13,35 @@ const appFile = join(root, '..', 'Biblia-Abigail.html');
 
 const html = readFileSync(appFile, 'utf8');
 
-const window = new Window({
-  url: 'http://localhost/?test=1',
-  settings: {
-    disableJavaScriptFileLoading: false,
-    disableJavaScriptEvaluation: false,
-    enableFileSystemHttpRequests: false,
-  }
+const virtualConsole = new VirtualConsole();
+virtualConsole.on('jsdomError', (e) => {
+  // Ignorar el CDN de Tailwind (no disponible sin red); reportar el resto
+  const msg = e.detail?.message || e.message || '';
+  if (!msg.includes('tailwindcss')) console.error('JSDOM:', msg.slice(0, 300));
 });
 
-window.document.write(html);
+const dom = new JSDOM(html, {
+  url: 'http://localhost/?test=1',
+  runScripts: 'dangerously',
+  pretendToBeVisual: true,
+  virtualConsole,
+});
+
+const window = dom.window;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Espera activa hasta que una condición se cumpla (React en jsdom tarda
+// variable en renderizar; un sleep fijo produce falsos negativos)
+async function waitFor(cond, msg, timeout = 3000) {
+  const start = Date.now();
+  while (Date.now() - start < timeout) {
+    try { if (cond()) return; } catch (e) { /* reintentar */ }
+    await sleep(100);
+  }
+  throw new Error(msg || 'waitFor: timeout');
 }
 
 async function waitForBridge(timeout = 15000) {
@@ -39,12 +55,27 @@ async function waitForBridge(timeout = 15000) {
   throw new Error('La app no expuso __ABIGAIL_TEST__');
 }
 
+// Proxy "vivo": cada llamada se resuelve contra el __ABIGAIL_TEST__ actual.
+// Necesario porque la app recrea el puente en cada render de React; guardar
+// una referencia vieja devolvería estado obsoleto (clausuras antiguas).
+function liveBridge() {
+  return new Proxy({}, {
+    get: (_, prop) => {
+      const b = window.__ABIGAIL_TEST__;
+      if (!b) return undefined;
+      const v = b[prop];
+      return typeof v === 'function' ? (...args) => b[prop](...args) : v;
+    },
+  });
+}
+
 const results = [];
 let passed = 0;
 
 async function runTest(name, fn) {
   try {
-    const bridge = await waitForBridge();
+    await waitForBridge();
+    const bridge = liveBridge();
     bridge.resetLocalStorage();
     await sleep(300);
     const msg = await fn(bridge);
@@ -70,51 +101,44 @@ const tests = {
 
   navegacion: async (bridge) => {
     bridge.seleccionarPasaje('mr9');
-    await sleep(300);
-    if (bridge.getState().pasajeId !== 'mr9') throw new Error('No cambió a mr9');
+    await waitFor(() => bridge.getState().pasajeId === 'mr9', 'No cambió a mr9');
     bridge.seleccionarPasaje('rm8');
-    await sleep(300);
-    if (bridge.getState().pasajeId !== 'rm8') throw new Error('No cambió a rm8');
+    await waitFor(() => bridge.getState().pasajeId === 'rm8', 'No cambió a rm8');
     bridge.seleccionarPasaje('jn1');
-    await sleep(300);
-    if (bridge.getState().pasajeId !== 'jn1') throw new Error('No volvió a jn1');
+    await waitFor(() => bridge.getState().pasajeId === 'jn1', 'No volvió a jn1');
     return 'Navegación mr9 → rm8 → jn1 OK';
   },
 
   versiculo: async (bridge) => {
     bridge.seleccionarPasaje('jn1');
-    await sleep(300);
+    await waitFor(() => bridge.getState().pasajeId === 'jn1', 'No cargó jn1');
     bridge.abrirVersiculo('jn1:1');
-    await sleep(300);
-    if (bridge.getState().sel !== 'jn1:1') throw new Error('No seleccionó jn1:1');
+    await waitFor(() => bridge.getState().sel === 'jn1:1', 'No seleccionó jn1:1');
     return 'Selección de versículo OK';
   },
 
   cadena: async (bridge) => {
     bridge.seleccionarPasaje('jn1');
-    await sleep(300);
+    await waitFor(() => bridge.getState().pasajeId === 'jn1', 'No cargó jn1');
     const antes = bridge.getCadenas().length;
     bridge.guardarCadena({
       desdeClave: 'jn1:1', desdeAncla: null,
       hastaClave: 'jn1:14', hastaRef: 'Juan 1:14', hastaAncla: null,
-      hastaFragTexto: null, tipo: 'Paralelo', porque: 'Test desde happy-dom'
+      hastaFragTexto: null, tipo: 'Paralelo', porque: 'Test desde jsdom'
     });
-    await sleep(300);
-    if (bridge.getCadenas().length !== antes + 1) throw new Error('Cadena no se agregó');
+    await waitFor(() => bridge.getCadenas().length === antes + 1, 'Cadena no se agregó');
     return `Cadena creada. Total: ${bridge.getCadenas().length}`;
   },
 
   nota: async (bridge) => {
-    bridge.guardarNota('jn1:1', null, 'Nota de prueba happy-dom');
-    await sleep(200);
-    if (!bridge.getNotas()['jn1:1']) throw new Error('Nota no guardada');
+    bridge.guardarNota('jn1:1', null, 'Nota de prueba jsdom');
+    await waitFor(() => !!bridge.getNotas()['jn1:1'], 'Nota no guardada');
     return 'Nota guardada en jn1:1';
   },
 
   contexto: async (bridge) => {
     bridge.guardarContexto('jn1:1', null, 'Contexto histórico de prueba');
-    await sleep(200);
-    if (!bridge.getVrContextos()['jn1:1']) throw new Error('Contexto no guardado');
+    await waitFor(() => !!bridge.getVrContextos()['jn1:1'], 'Contexto no guardado');
     return 'Contexto histórico guardado';
   },
 
@@ -130,16 +154,20 @@ const tests = {
 
   exportar: async (bridge) => {
     let captured = null;
-    const original = window.URL.createObjectURL;
+    // jsdom no implementa createObjectURL/revokeObjectURL: sustituir por stubs
+    const origCreate = window.URL.createObjectURL;
+    const origRevoke = window.URL.revokeObjectURL;
     window.URL.createObjectURL = (blob) => {
       const reader = new window.FileReader();
       reader.onload = () => { captured = reader.result; };
       reader.readAsText(blob);
-      return original(blob);
+      return 'blob:mock';
     };
+    window.URL.revokeObjectURL = () => {};
     bridge.exportarEstudio();
     await sleep(500);
-    window.URL.createObjectURL = original;
+    window.URL.createObjectURL = origCreate;
+    window.URL.revokeObjectURL = origRevoke;
     if (!captured) throw new Error('No se capturó export');
     const data = JSON.parse(captured);
     if (!data.app || data.app !== 'abigail') throw new Error('Export inválido');

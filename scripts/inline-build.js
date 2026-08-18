@@ -49,17 +49,20 @@ let html = readFileSync(indexPath, 'utf8');
 // 3. Inlinear CSS
 const cssMatch = html.match(/<link[^>]+rel=["']stylesheet["'][^>]+href=["']([^"']+)["'][^>]*>/i);
 if (cssMatch) {
-  const cssPath = join(dist, cssMatch[1].replace(/^\//, ''));
+  const cssPath = join(dist, cssMatch[1].replace(/^\/(biblia-abigail\/)?/, ''));
   const css = readFileSync(cssPath, 'utf8');
-  html = html.replace(cssMatch[0], `<style>${css}</style>`);
+  html = html.replace(cssMatch[0], () => `<style>${css}</style>`);
 }
 
 // 4. Inlinear JS
 const jsMatch = html.match(/<script[^>]+type=["']module["'][^>]+src=["']([^"']+)["'][^>]*><\/script>/i);
 if (jsMatch) {
-  const jsPath = join(dist, jsMatch[1].replace(/^\//, ''));
+  const jsPath = join(dist, jsMatch[1].replace(/^\/(biblia-abigail\/)?/, ''));
   const js = readFileSync(jsPath, 'utf8');
-  html = html.replace(jsMatch[0], `<script type="module">${js}</script>`);
+  // Script clásico (no module) al final del body: compatible con WebViews
+  // antiguos y happy-dom/jsdom, y garantiza que #root ya existe al ejecutarse
+  html = html.replace(jsMatch[0], '');
+  html = html.replace('</body>', () => `<script>${js}</script></body>`);
 }
 
 // 5. Quitar tags que no aplican al HTML embebido (manifest, service worker, iconos)
