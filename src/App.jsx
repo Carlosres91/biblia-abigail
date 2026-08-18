@@ -257,7 +257,7 @@ const PROVEEDORES = {
   local: { nombre: "Local (Ollama)", url: "http://localhost:11434/v1/chat/completions", modelo: "llama3.2", key: false },
   otro: { nombre: "Otro (compatible OpenAI)", url: "", modelo: "", key: true },
 };
-const IA_CONF_DEF = { activo: "gemini", urlOtro: "", claves: {}, modelos: {} };
+const IA_CONF_DEF = { activo: "gemini", urlOtro: "", claves: {}, modelos: {}, autoCerebro: true };
 
 // ============================================================
 export default function Abigail() {
@@ -295,6 +295,7 @@ export default function Abigail() {
   const [iaPrueba, setIaPrueba] = useState("");
   const [cerebro, setCerebro] = useState(() => cargar("abigail.cerebro", { sintesis: "", actualizado: "", elementos: 0 }));
   const [cerebroMsg, setCerebroMsg] = useState("");
+  const autoCerebroEnCurso = useRef(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -391,13 +392,13 @@ export default function Abigail() {
     }]);
     setAnclaDestino(null);
     if (seguir) {
-      // sigue abierto, misma ancla de origen, formulario limpio
       setForm(FORM_VACIO);
       setGuardadaOk(hastaRef);
     } else {
       setGuardadaOk("");
       setModo("cadenas");
     }
+    triggerAutoCerebro();
   };
 
   const guardarNota = () => {
@@ -405,6 +406,7 @@ export default function Abigail() {
     const nx = { ...notas };
     if (notaBorrador.trim()) nx[nk] = notaBorrador.trim(); else delete nx[nk];
     setNotas(nx); setModo("cadenas");
+    triggerAutoCerebro();
   };
 
   const resaltar = (color) => {
@@ -530,7 +532,7 @@ export default function Abigail() {
   // ---- el Cerebro de Abigail: todo el estudio del lector, destilado (v18 pulido) ----
   const materialCerebro = () => {
     const partes = [];
-    const MAX = 4200; // límite suave para no inflar tokens
+    const MAX = 4200;
     let chars = 0;
 
     const push = (s) => {
@@ -540,7 +542,7 @@ export default function Abigail() {
       return true;
     };
 
-    // 1. Convictions from IA-assisted and manual studies (respuestas del lector)
+    // Convictions (the reader's actual decisions — highest value)
     estudios.filter((e) => e.propio).forEach((e) => {
       (e.discernimiento || []).forEach((d) => {
         const r = (d.respuesta || "").trim();
@@ -548,38 +550,49 @@ export default function Abigail() {
           push(`CONVICCIÓN [${e.ancla}] ${String(d.pregunta).slice(0,110)} → ${r.slice(0,180)}`);
         }
       });
-      // Include key content from saved studies (especially IA-assisted) for historical/theological memory
       if (e.parrafos && e.parrafos.length) {
         const head = e.parrafos.slice(0, 2).map(p => p.slice(0, 160)).join(" | ");
         push(`ESTUDIO [${e.ancla}] ${e.titulo}: ${head}`);
       }
     });
 
-    // 2. Chains with their "porqué" — these are the strongest intertextual memory
+    // Chains — core intertextual memory of the reader
     cadenas.forEach((c) => {
       if (c.porque) {
         const tipo = c.tipo ? ` (${c.tipo})` : "";
-        const ia = c.sugeridaIA ? " [IA]" : "";
+        const ia = c.sugeridaIA ? " [aceptada de IA]" : "";
         push(`CADENA${ia}${tipo} ${refDe(c.desdeClave)} ⟶ ${c.hastaRef}: ${String(c.porque).slice(0,140)}`);
       }
     });
 
-    // 3. Notes (reader annotations)
+    // Notes
     Object.entries(notas).forEach(([k, t]) => {
       push(`NOTA [${refDe(k.split("@")[0])}] ${String(t).slice(0,120)}`);
     });
 
-    // 4. Currently reading custom passages
+    // Custom passages being read
     Object.values(pasajes).forEach((p) => {
       if (!PASAJES[p.id]) push(`LEYENDO: ${p.titulo}`);
     });
 
-    // 5. Add titles of all saved studies (for topic overview)
+    // Recent study titles
     estudios.filter((e) => e.propio).slice(-6).forEach((e) => {
       push(`TÍTULO ESTUDIO: ${e.titulo} (${e.ancla})`);
     });
 
     return partes;
+  };
+
+  // Firma ligera para detectar material nuevo sin sintetizar (más confiable que longitud cruda)
+  const materialSignature = () => {
+    let conv = 0, cad = 0, not = 0, est = 0;
+    estudios.filter((e) => e.propio).forEach((e) => {
+      (e.discernimiento || []).forEach((d) => { if ((d.respuesta || "").trim()) conv++; });
+      if (e.parrafos && e.parrafos.length) est++;
+    });
+    cadenas.forEach((c) => { if (c.porque) cad++; });
+    Object.keys(notas).forEach(() => not++);
+    return { conv, cad, not, est, total: conv + cad + not + est };
   };
 
   const actualizarCerebro = async () => {
@@ -595,6 +608,31 @@ export default function Abigail() {
       setCerebro({ sintesis: String(d.sintesis), actualizado: new Date().toISOString(), elementos: material.length });
       setCerebroMsg("✓ Cerebro actualizado con " + material.length + " elementos");
     } catch (e) { setCerebroMsg("✗ " + (e.message || "no pude sintetizar")); }
+  };
+
+  // Actualización automática ligera del Cerebro (no bloquea la UI)
+  const triggerAutoCerebro = () => {
+    if (iaConf.autoCerebro === false) return;
+    if (autoCerebroEnCurso.current) return;
+    if (!cerebro.sintesis) return; // solo actualiza si ya hay una síntesis previa
+    (async () => {
+      autoCerebroEnCurso.current = true;
+      try {
+        const material = materialCerebro();
+        if (material.length === 0) { autoCerebroEnCurso.current = false; return; }
+        const sys = "Eres el archivista fiel de un estudioso serio de la Biblia Reina-Valera 1960. Sintetiza SOLO con el material. Compacto (≤250 palabras). JSON únicamente.";
+        const usr = 'MATERIAL:\n"""' + material.join("\n") + '"""\nProduce: {"sintesis":"perfil compacto y fiel con convicciones, temas y cadenas"}';
+        const txt = await llamarIA([{ role: "system", content: sys }, { role: "user", content: usr }], iaConf.activo, true);
+        const d = parsearJSONSeguro(txt);
+        if (d.sintesis) {
+          setCerebro({ sintesis: String(d.sintesis), actualizado: new Date().toISOString(), elementos: material.length });
+        }
+      } catch (_) {
+        // silencioso — el usuario puede pulsar "Actualizar" manualmente
+      } finally {
+        autoCerebroEnCurso.current = false;
+      }
+    })();
   };
 
   const bloqueConvicciones = () => {
@@ -790,6 +828,7 @@ REQUISITOS DE CALIDAD:
     setEstudios([...estudios, nuevo]);
     setAnalisisAbierto(false); setAnDatos(null); setAnResp({});
     setEstudioAbierto(nuevo);
+    triggerAutoCerebro();
   };
 
   const exportarEstudio = () => {
@@ -904,6 +943,27 @@ REQUISITOS DE CALIDAD:
                 ))}
                 <button onClick={() => { setSelectorAbierto(false); setCargadorAbierto(true); setSearchOpen(false); }} className="w-full text-left px-4 py-3" style={{ color: C.oroClaro, borderTop: `1px solid ${C.purpura}`, fontSize: 14, fontWeight: 700 }}>
                   ＋ Agregar pasaje · pega el texto de tu Biblia
+                </button>
+              </div>
+            )}
+
+            {/* Cerebro status pill — visible reminder of the reader's distilled memory */}
+            {cerebro.sintesis && vista === "leer" && (
+              <div className="mt-2 flex items-center gap-2">
+                <button
+                  onClick={() => setAjustesIAAbierto(true)}
+                  className="px-3 py-1 rounded-full text-left"
+                  style={{ background: C.nocheAlta, border: `1px solid ${C.purpura}`, fontSize: 11, color: C.claro }}
+                >
+                  🧠 Cerebro: {cerebro.elementos} elementos
+                  {(() => { const sig = materialSignature(); const n = sig.total > cerebro.elementos ? sig.total - cerebro.elementos : 0; return n > 0 ? <span style={{ color: C.oroClaro }}> · {n} nuevos</span> : null; })()}
+                </button>
+                <button
+                  onClick={actualizarCerebro}
+                  disabled={cerebroMsg.startsWith("…")}
+                  style={{ fontSize: 10, padding: "2px 10px", borderRadius: 999, border: `1px solid ${C.oro}`, color: "#7A5E10", background: "transparent" }}
+                >
+                  Actualizar
                 </button>
               </div>
             )}
@@ -1378,11 +1438,19 @@ REQUISITOS DE CALIDAD:
                 <input type="checkbox" checked={iaConf.usarDiscernimiento !== false} onChange={(e) => setIaConf({ ...iaConf, usarDiscernimiento: e.target.checked })} />
                 Usar mi discernimiento previo en análisis y preguntas
               </label>
+              <label className="flex items-center gap-2 mb-3" style={{ fontSize: 12.5, color: C.tinta }}>
+                <input type="checkbox" checked={iaConf.autoCerebro !== false} onChange={(e) => setIaConf({ ...iaConf, autoCerebro: e.target.checked })} />
+                Actualizar el Cerebro automáticamente al guardar cadenas, notas o análisis
+              </label>
               <div className="px-3 py-3 rounded-md mb-2" style={{ background: "#FFFDF6", border: `1px solid ${C.papelBorde}` }}>
                 <div style={{ fontSize: 10, letterSpacing: "0.18em", color: C.tintaSuave, marginBottom: 4 }}>CEREBRO DE ABIGAIL</div>
                 <div style={{ fontSize: 11.5, color: C.tintaSuave, lineHeight: 1.5, marginBottom: 4 }}>
                   {cerebro.sintesis
-                    ? <>Síntesis de <b>{cerebro.elementos}</b> elementos {materialCerebro().length > cerebro.elementos ? <><b style={{ color: "#7A5E10" }}>· {materialCerebro().length - cerebro.elementos} nuevos sin sintetizar</b></> : <>· al día</>}</>
+                    ? (() => {
+                        const sig = materialSignature();
+                        const nuevos = sig.total > cerebro.elementos ? sig.total - cerebro.elementos : 0;
+                        return <>Síntesis de <b>{cerebro.elementos}</b> elementos {nuevos > 0 ? <><b style={{ color: "#7A5E10" }}>· {nuevos} nuevos sin sintetizar</b></> : <>· al día</>}</>;
+                      })()
                     : <>Sin sintetizar aún — reúne cadenas, notas, convicciones y estudios para que las IAs sepan lo que ya has discernido.</>}
                 </div>
 
