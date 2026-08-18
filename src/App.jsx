@@ -7,7 +7,6 @@ import {
   salientesDe, entrantesDe, estudiosDe, colorPalabra, notasDelVersiculo,
   conviccionesLector, materialCerebro, materialSignature,
 } from "./lib/core.js";
-import { getTestKey } from "./lib/test-keys.js";
 
 // ============================================================
 // ABIGAIL · אביגיל — Prototipo v18 (laboratorio)
@@ -153,14 +152,7 @@ export default function Abigail() {
   const [anError, setAnError] = useState("");
   const [anDatos, setAnDatos] = useState(null);
   const [anResp, setAnResp] = useState({});
-  const [iaConf, setIaConf] = useState(() => {
-    const saved = cargar("abigail.ia", IA_CONF_DEF);
-    // Si no hay claves guardadas, usar claves de prueba (TEMPORAL)
-    const claves = { ...(saved.claves || {}) };
-    if (!claves.groq && getTestKey("groq")) claves.groq = getTestKey("groq");
-    if (!claves.gemini && getTestKey("gemini")) claves.gemini = getTestKey("gemini");
-    return { ...saved, claves };
-  });
+  const [iaConf, setIaConf] = useState(() => cargar("abigail.ia", IA_CONF_DEF));
   const [ajustesIAAbierto, setAjustesIAAbierto] = useState(false);
   const [iaCargando, setIaCargando] = useState(false);
   const [iaError, setIaError] = useState("");
