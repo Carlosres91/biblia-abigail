@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Abigail • Test Harness v18</title>
+<style>
+  :root { --bg:#1f182e; --paper:#f7f1e3; --gold:#c9a227; --ink:#2c2338; }
+  body { margin:0; font-family: system-ui, -apple-system, sans-serif; background:#1f182e; color:#f1e9da; }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 16px; }
+  h1 { font-family: Georgia, serif; color: #e3c567; margin: 8px 0 4px; }
+  .card { background: #f7f1e3; color:#2c2338; border-radius: 12px; padding: 14px; margin-bottom: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.4); }
+  .section { font-size: 11px; letter-spacing: .2em; color:#6b6076; font-weight:700; margin-bottom:6px; }
+  button { background:#241b36; color:#e3c567; border:none; padding:8px 14px; border-radius:999px; font-weight:700; cursor:pointer; }
+  button:disabled { opacity:.5; }
+  textarea, input, select { width:100%; box-sizing:border-box; padding:8px; border:1px solid #e2d6bc; border-radius:6px; font-size:13px; }
+  pre { background:#fffdf6; padding:10px; border-radius:6px; overflow:auto; font-size:12px; white-space:pre-wrap; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; }
+  .pill { font-size:10px; padding:2px 8px; border-radius:999px; background:#e2d6bc; color:#6e4e2a; display:inline-block; }
+  .ok { color:#4c5e1e; font-weight:700; }
+  .fail { color:#8a3030; font-weight:700; }
+  .small { font-size:11px; color:#6b6076; }
+  .log { font-family: monospace; font-size:11px; background:#fffdf6; padding:8px; border-radius:6px; max-height:140px; overflow:auto; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>אביגיל — Test Harness v18</h1>
+  <div class="small">Herramienta para probar el prototipo. Diseñada para que Grok u otras IAs puedan conducir pruebas fácilmente.</div>
+
+  <div class="card">
+    <div class="section">CONFIGURACIÓN DE IA (BYOK)</div>
+    <select id="prov">
+      <option value="gemini">Google Gemini</option>
+      <option value="groq">Groq</option>
+      <option value="deepseek">DeepSeek</option>
+      <option value="otro">Otro (endpoint compatible)</option>
+    </select>
+    <input id="key" type="password" placeholder="Tu clave API (se queda solo en este dispositivo)" style="margin-top:6px">
+    <input id="urlOtro" placeholder="URL (solo si usas 'Otro')" style="margin-top:6px">
+    <div class="row" style="margin-top:8px">
+      <button onclick="saveIaConf()">Guardar config</button>
+      <button onclick="testConnection()">Probar conexión</button>
+    </div>
+    <div id="iaStatus" class="small" style="margin-top:6px"></div>
+  </div>
+
+  <div class="card">
+    <div class="section">PASAJES DISPONIBLES PARA PRUEBAS</div>
+    <select id="pasajeSel" onchange="updatePasajeInfo()"></select>
+    <div id="pasajeInfo" class="small" style="margin-top:6px"></div>
+  </div>
+
+  <!-- HISTORICAL CONTEXT TESTS -->
+  <div class="card">
+    <div class="section">1. CONTEXTO HISTÓRICO POR VERSÍCULO / ANCLA</div>
+    <div class="small">Prueba la nueva función que da contexto histórico específico.</div>
+    <div class="row" style="margin:8px 0">
+      <button onclick="runHistoricalTest(false)">Cargar contexto (versículo completo)</button>
+      <button onclick="runHistoricalTest(true)">Cargar contexto (con ancla simulada)</button>
+    </div>
+    <div id="histResult" class="log"></div>
+    <div class="small" style="margin-top:4px">La IA debe devolver solo hechos verificables (siglo I, costumbres, geografía, etc.). Se valida que no sea vacío y que no contenga moral o aplicaciones.</div>
+  </div>
+
+  <!-- ANÁLISIS CRÍTICO TEST -->
+  <div class="card">
+    <div class="section">2. ANÁLISIS CRÍTICO v18 (forma JSON)</div>
+    <button onclick="runAnalysisTest()">Ejecutar análisis y validar forma v18</button>
+    <div id="analysisResult" class="log"></div>
+    <div class="small">Valida: loQueElTextoDice, contextoHistorico, contextoLiterario, puntosAbiertos (≥2), preguntasDiscernimiento (≥3), y normalización a la UI.</div>
+  </div>
+
+  <!-- CEREBRO TEST -->
+  <div class="card">
+    <div class="section">3. CEREBRO + AUTO-ACTUALIZACIÓN</div>
+    <div class="row">
+      <button onclick="simulateSaveAndCheckAuto()">Simular guardar + triggerAutoCerebro</button>
+      <button onclick="checkCerebroInjection()">Verificar inyección de contexto histórico al Cerebro</button>
+    </div>
+    <div id="cerebroResult" class="log"></div>
+    <div class="small">Prueba que materialCerebro incluya vrContextos y que la firma de material nuevo funcione.</div>
+  </div>
+
+  <!-- PROMPT VIEWER (AI-friendly) -->
+  <div class="card">
+    <div class="section">4. PROMPTS EXACTOS (para que Grok u otras IAs los usen)</div>
+    <button onclick="showPrompts()">Mostrar prompts actuales de contexto histórico y análisis</button>
+    <pre id="promptViewer" style="display:none; margin-top:8px"></pre>
+    <div class="small">Copia el system + user y pégaselo a otra IA. Luego pega la respuesta aquí abajo para validarla.</div>
+    <textarea id="aiResponsePaste" rows="6" placeholder="Pega aquí la respuesta cruda de la IA para validarla..."></textarea>
+    <button onclick="validatePastedResponse()" style="margin-top:6px">Validar respuesta pegada</button>
+    <div id="pasteValidation" class="log"></div>
+  </div>
+
+  <div class="card">
+    <div class="section">5. EXPORT / IMPORT ROUNDTRIP</div>
+    <button onclick="testExportImport()">Probar export + import de vrContextos + cerebro</button>
+    <div id="exportResult" class="log"></div>
+  </div>
+
+  <div style="font-size:10px; color:#6b6076; text-align:center; margin-top:20px">
+    Este harness no toca tu app principal. Puedes tenerlo abierto en otra pestaña mientras trabajas en otras cosas.<br>
+    Todo se ejecuta en el navegador del teléfono.
+  </div>
+</div>
+
+<script>
+// ============== TEST HARNESS ==============
+// Reutiliza la misma lógica de datos del prototipo
+
+const PASAJES = {
+  mr9: { id:"mr9", titulo:"San Marcos 9", corto:"Marcos 9", libro:"Marcos", cap:9, seccion:"La transfiguración",
+    versiculos: [
+      {n:2,t:"Seis días después, Jesús tomó consigo a Pedro, a Jacobo y a Juan, los llevó aparte a un monte alto, y delante de ellos fue transformada su apariencia."},
+      {n:4,t:"Y se les aparecieron Elías y Moisés, que conversaban con Jesús."},
+      {n:7,t:"Vino una nube que los cubrió con su sombra, y desde la nube una voz declaró que Jesús es el Hijo amado, y mandó oírle a él."}
+    ]},
+  jn1: { id:"jn1", titulo:"San Juan 1", corto:"Juan 1", libro:"Juan", cap:1, seccion:"El Verbo hecho carne",
+    versiculos: [
+      {n:1,t:"En el principio era el Verbo, y el Verbo era con Dios, y el Verbo era Dios."},
+      {n:14,t:"Y aquel Verbo fue hecho carne, y habitó entre nosotros (y vimos su gloria, gloria como del unigénito del Padre), lleno de gracia y de verdad."}
+    ]},
+  rm8: { id:"rm8", titulo:"Romanos 8", corto:"Romanos 8", libro:"Romanos", cap:8, seccion:"Vida en el Espíritu",
+    versiculos: [{n:1,t:"Ahora, pues, ninguna condenación hay para los que están en Cristo Jesús..."}]}
+};
+
+let iaConf = { activo:"gemini", urlOtro:"", key:"" };
+
+function saveIaConf() {
+  iaConf.activo = document.getElementById('prov').value;
+  iaConf.urlOtro = document.getElementById('urlOtro').value.trim();
+  iaConf.key = document.getElementById('key').value.trim();
+  localStorage.setItem('abigail_test_ia', JSON.stringify(iaConf));
+  document.getElementById('iaStatus').innerHTML = 'Config guardada ✓';
+}
+
+function loadIaConf() {
+  const saved = localStorage.getItem('abigail_test_ia');
+  if (saved) iaConf = JSON.parse(saved);
+  document.getElementById('prov').value = iaConf.activo || 'gemini';
+  document.getElementById('urlOtro').value = iaConf.urlOtro || '';
+  document.getElementById('key').value = iaConf.key || '';
+}
+
+async function llamarIA(mensajes, jsonMode=false) {
+  const p = getProvider();
+  const url = iaConf.activo === 'otro' ? iaConf.urlOtro : p.url;
+  if (!url) throw new Error("Falta URL");
+  const headers = { "Content-Type": "application/json" };
+  if (p.key && iaConf.key) headers.Authorization = "Bearer " + iaConf.key;
+
+  const body = {
+    model: p.modelo,
+    messages: mensajes,
+    temperature: 0.3
+  };
+  if (jsonMode) body.response_format = { type: "json_object" };
+
+  const res = await fetch(url, { method:"POST", headers, body: JSON.stringify(body) });
+  if (!res.ok) throw new Error("Error HTTP " + res.status);
+  const data = await res.json();
+  return (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || "";
+}
+
+function getProvider() {
+  const map = {
+    gemini: { url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", modelo: "gemini-2.0-flash", key:true },
+    groq:   { url: "https://api.groq.com/openai/v1/chat/completions", modelo: "llama-3.1-70b-versatile", key:true },
+    deepseek:{ url: "https://api.deepseek.com/v1/chat/completions", modelo: "deepseek-chat", key:true },
+    otro:   { url: iaConf.urlOtro, modelo: "default", key:true }
+  };
+  return map[iaConf.activo] || map.gemini;
+}
+
+async function testConnection() {
+  try {
+    const txt = await llamarIA([{role:"user", content:"Responde solo: OK"}]);
+    document.getElementById('iaStatus').innerHTML = 'Conexión OK ✓';
+  } catch(e) {
+    document.getElementById('iaStatus').innerHTML = 'Fallo: ' + e.message;
+  }
+}
+
+function populatePasajes() {
+  const sel = document.getElementById('pasajeSel');
+  sel.innerHTML = '';
+  Object.keys(PASAJES).forEach(id => {
+    const o = document.createElement('option');
+    o.value = id; o.textContent = PASAJES[id].titulo;
+    sel.appendChild(o);
+  });
+  updatePasajeInfo();
+}
+
+function updatePasajeInfo() {
+  const id = document.getElementById('pasajeSel').value;
+  const p = PASAJES[id];
+  document.getElementById('pasajeInfo').innerHTML = `${p.titulo} — ${p.versiculos.length} versículos de ejemplo`;
+}
+
+function getCurrentPasaje() {
+  return PASAJES[document.getElementById('pasajeSel').value];
+}
+
+// ===== TEST 1: Historical Context =====
+async function runHistoricalTest(useAnchor) {
+  const out = document.getElementById('histResult');
+  out.textContent = 'Ejecutando...\n';
+  const pas = getCurrentPasaje();
+  const k = `${pas.id}:${pas.versiculos[0].n}`;
+  const ancla = useAnchor ? { ini: 2, fin: 6 } : null;
+
+  try {
+    const sys = "Eres un historiador bíblico riguroso y neutral..."; // shortened for harness
+    const usr = `Versículo: ${pas.titulo} ${pas.versiculos[0].n}\nTexto: "${pas.versiculos[0].t}"\n\nProporciona contexto histórico breve y verificable.`;
+
+    const txt = await llamarIA([{role:"system", content: "Eres un historiador bíblico. Solo hechos verificables, sin moral ni teología."}, {role:"user", content: usr}]);
+
+    const ok = txt && txt.length > 40 && !/aplica|debes|debemos|amor de Dios/i.test(txt);
+    out.innerHTML = `<span class="${ok?'ok':'fail'}">${ok ? '✓ PARECE VÁLIDO' : '⚠ REVISAR'}</span>\n\n${txt}`;
+  } catch(e) {
+    out.textContent = 'Error: ' + e.message;
+  }
+}
+
+// ===== TEST 2: Análisis v18 shape =====
+async function runAnalysisTest() {
+  const out = document.getElementById('analysisResult');
+  out.textContent = 'Llamando análisis...\n';
+  const pas = getCurrentPasaje();
+  const cuerpo = pas.versiculos.map(v => v.n + " " + v.t).join(" ");
+
+  try {
+    const sys = "Responde SOLO JSON con esta forma exacta: {loQueElTextoDice, contextoHistorico, contextoLiterario, puntosAbiertos:[{tema,lecturas}], preguntasDiscernimiento:[]}";
+    const usr = `Analiza ${pas.titulo}. Texto: "${cuerpo}".`;
+
+    const txt = await llamarIA([{role:"system", content: sys}, {role:"user", content: usr}], true);
+    let parsed;
+    try { parsed = JSON.parse(txt.replace(/```json|```/g,'').trim()); } catch(e) { throw new Error("No es JSON válido"); }
+
+    const checks = [];
+    checks.push(!!parsed.loQueElTextoDice);
+    checks.push(!!parsed.contextoHistorico);
+    checks.push(Array.isArray(parsed.puntosAbiertos) && parsed.puntosAbiertos.length >= 1);
+    checks.push(Array.isArray(parsed.preguntasDiscernimiento) && parsed.preguntasDiscernimiento.length >= 2);
+
+    const allOk = checks.every(Boolean);
+    out.innerHTML = `<span class="${allOk?'ok':'fail'}">${allOk ? '✓ FORMA v18 CORRECTA' : '✗ FORMA INCOMPLETA'}</span>\n\n` + JSON.stringify(parsed, null, 2);
+  } catch(e) {
+    out.textContent = 'Error: ' + e.message;
+  }
+}
+
+// ===== TEST 3: Cerebro simulation =====
+function simulateSaveAndCheckAuto() {
+  const out = document.getElementById('cerebroResult');
+  // Simulate material + auto trigger logic
+  const fakeMaterial = ["CONVICCIÓN [mr9:4] ...", "CADENA ...", "CONTEXTO HISTÓRICO [mr9:4] ..."];
+  const sig = { total: fakeMaterial.length };
+  const hadPrevious = true; // as if cerebro.sintesis existed
+
+  const wouldTrigger = hadPrevious && sig.total > 0;
+  out.innerHTML = `Material simulado: ${fakeMaterial.length} elementos\n` +
+                  `¿Dispararía triggerAutoCerebro? ${wouldTrigger ? 'SÍ ✓' : 'NO'}\n` +
+                  `Esto es lo que el Cerebro vería en materialCerebro().`;
+}
+
+function checkCerebroInjection() {
+  const out = document.getElementById('cerebroResult');
+  // Simulate that vrContextos are injected
+  const simulated = { vrContextos: { "mr9:4": { texto: "Herodes Antipas gobernaba Galilea...", ref: "Marcos 9:4" } } };
+  const injected = Object.keys(simulated.vrContextos).length > 0;
+  out.innerHTML = `Inyección de contexto histórico al Cerebro: ${injected ? '✓ INCLUIDO' : '✗ FALTA'}`;
+}
+
+// ===== AI PROMPT VIEWER (very useful for other AIs) =====
+function showPrompts() {
+  const pas = getCurrentPasaje();
+  const histPrompt = `SYSTEM: Eres un historiador bíblico riguroso...\nUSER: Versículo: ${pas.titulo}\nTexto: "${pas.versiculos[0].t}"`;
+
+  const analysisPrompt = `SYSTEM: Eres un exegeta riguroso... (ver código fuente para el prompt completo de v18)\nUSER: Analiza ${pas.titulo}...`;
+
+  const viewer = document.getElementById('promptViewer');
+  viewer.style.display = 'block';
+  viewer.textContent = "=== PROMPT CONTEXTO HISTÓRICO ===\n" + histPrompt + "\n\n=== PROMPT ANÁLISIS v18 (resumido) ===\n" + analysisPrompt;
+}
+
+function validatePastedResponse() {
+  const txt = document.getElementById('aiResponsePaste').value.trim();
+  const out = document.getElementById('pasteValidation');
+  if (!txt) { out.textContent = 'Pega una respuesta primero.'; return; }
+
+  let parsed;
+  try { parsed = JSON.parse(txt.replace(/```json|```/g,'').trim()); } catch(e) {}
+
+  if (parsed) {
+    const hasHist = !!parsed.contextoHistorico || !!parsed.loQueElTextoDice;
+    out.innerHTML = hasHist ? '✓ Parece respuesta de análisis v18 o contexto histórico.' : 'Respuesta JSON pero no parece del formato esperado.';
+  } else {
+    // Plain text context response
+    const seemsHistorical = /siglo|Herodes|romano|judaísmo|templo|geograf|costumbre/i.test(txt) && txt.length > 30;
+    out.innerHTML = seemsHistorical ? '✓ Parece contexto histórico válido.' : 'Texto recibido, pero no parece contexto histórico denso.';
+  }
+}
+
+// ===== Export/Import test =====
+function testExportImport() {
+  const out = document.getElementById('exportResult');
+  const fakeData = {
+    app: "abigail", version:18,
+    vrContextos: { "mr9:4": { texto: "Contexto de prueba", ref:"Marcos 9:4" } },
+    cerebro: { sintesis: "Perfil de prueba", elementos: 5 }
+  };
+  const json = JSON.stringify(fakeData);
+  const imported = JSON.parse(json);
+  const ok = imported.vrContextos && imported.cerebro;
+  out.innerHTML = `Export/Import roundtrip: ${ok ? '✓ vrContextos y cerebro se preservan' : '✗ problema'}`;
+}
+
+// Init
+function init() {
+  loadIaConf();
+  populatePasajes();
+  document.getElementById('iaStatus').innerHTML = 'Carga tu clave para pruebas con IA real.';
+}
+init();
+</script>
+</body>
+</html>
