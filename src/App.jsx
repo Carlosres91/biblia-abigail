@@ -7,6 +7,7 @@ import {
   salientesDe, entrantesDe, estudiosDe, colorPalabra, notasDelVersiculo,
   conviccionesLector, materialCerebro, materialSignature,
 } from "./lib/core.js";
+import { BIBLIA } from "./lib/biblia-rvr1960.js";
 
 // ============================================================
 // ABIGAIL · אביגיל — Prototipo v18 (laboratorio)
@@ -143,7 +144,7 @@ export default function Abigail() {
   const [notaBorrador, setNotaBorrador] = useState("");
   const [selectorAbierto, setSelectorAbierto] = useState(false);
   const [guardadaOk, setGuardadaOk] = useState("");
-  const [pasajes, setPasajes] = useState(() => ({ ...PASAJES, ...cargar("abigail.pasajes", {}) }));
+  const [pasajes, setPasajes] = useState(() => ({ ...PASAJES, ...BIBLIA, ...cargar("abigail.pasajes", {}) }));
   const [cargadorAbierto, setCargadorAbierto] = useState(false);
   const [cargForm, setCargForm] = useState({ libro: "", cap: "", seccion: "", texto: "" });
   const [cargMasivo, setCargMasivo] = useState("");
@@ -183,7 +184,7 @@ export default function Abigail() {
   useEffect(() => { guardarLocal("abigail.notas", notas); }, [notas]);
   useEffect(() => {
     const propios = {};
-    Object.entries(pasajes).forEach(([id, p]) => { if (!PASAJES[id]) propios[id] = p; });
+    Object.entries(pasajes).forEach(([id, p]) => { if (!PASAJES[id] && !BIBLIA[id]) propios[id] = p; });
     guardarLocal("abigail.pasajes", propios);
   }, [pasajes]);
   useEffect(() => { guardarLocal("abigail.ia", iaConf); }, [iaConf]);
@@ -623,7 +624,7 @@ REQUISITOS DE CALIDAD:
 
   const exportarEstudio = () => {
     const propios = {};
-    Object.entries(pasajes).forEach(([id, p]) => { if (!PASAJES[id]) propios[id] = p; });
+    Object.entries(pasajes).forEach(([id, p]) => { if (!PASAJES[id] && !BIBLIA[id]) propios[id] = p; });
     const datos = { app: "abigail", version: 18, exportado: new Date().toISOString(), cadenas, resaltados, notas, pasajes: propios, estudios: estudios.filter((e) => e.propio), cerebro, vrContextos };
     const blob = new Blob([JSON.stringify(datos, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -786,7 +787,7 @@ REQUISITOS DE CALIDAD:
             )}
 
             {selectorAbierto && (
-              <div className="absolute left-0 right-0 mt-1 rounded-2xl overflow-hidden z-30" style={{ background: C.nocheAlta, border: `1px solid ${C.purpura}` }}>
+              <div className="absolute left-0 right-0 mt-1 rounded-2xl overflow-hidden z-30" style={{ background: C.nocheAlta, border: `1px solid ${C.purpura}`, maxHeight: "55vh", overflowY: "auto" }}>
                 {Object.values(pasajes).map((p) => (
                   <button key={p.id} onClick={() => { setPasajeId(p.id); setSelectorAbierto(false); setSel(null); setMargenAbierto(null); setSearchOpen(false); }} className="w-full text-left px-4 py-3" style={{ fontFamily: "Georgia, serif", color: p.id === pasajeId ? C.oroClaro : C.claro, background: p.id === pasajeId ? C.purpura : "transparent" }}>
                     {p.titulo} <span style={{ fontSize: 12, color: C.claroSuave }}>· {p.seccion}</span>

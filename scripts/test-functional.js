@@ -143,14 +143,12 @@ const tests = {
   },
 
   masivo: async (bridge) => {
-    const antes = Object.keys(bridge.getState().pasajes).length;
-    const n = bridge.guardarMasivo('Juan 5\n1 Después de estas cosas había una fiesta. 2 Y hay en Jerusalén un estanque.\nHechos 2\n1 Cuando llegó el día de Pentecostés. 2 Y de repente vino del cielo un estruendo.');
+    // Con la Biblia integrada, importar un capítulo existente lo sobrescribe
+    const n = bridge.guardarMasivo('Juan 5\n1 Texto de prueba cinco. 2 Segunda línea de prueba.\nHechos 2\n1 Texto hechos uno. 2 Texto hechos dos.');
     if (n !== 2) throw new Error(`se importaron ${n}, se esperaban 2`);
-    await waitFor(() => Object.keys(bridge.getState().pasajes).length === antes + 2, 'Pasajes no aparecieron en el estado');
-    const st = bridge.getState();
-    if (!st.pasajes['u_juan_5'] || !st.pasajes['u_hechos_2']) throw new Error('Faltan los pasajes importados');
-    if (st.pasajes['u_juan_5'].versiculos.length !== 2) throw new Error('Juan 5 mal parseado');
-    return `Importación masiva OK: Juan 5 y Hechos 2 (${st.pasajes['u_hechos_2'].versiculos.length} vers. c/u)`;
+    await waitFor(() => bridge.getState().pasajes['u_juan_5']?.versiculos?.[0]?.t.includes('Texto de prueba'), 'Juan 5 no se actualizó');
+    await waitFor(() => bridge.getState().pasajes['u_hechos_2']?.versiculos?.length === 2, 'Hechos 2 no se actualizó');
+    return 'Importación masiva OK (sobreescribe capítulos existentes)';
   },
 
   persistencia: async (bridge) => {
