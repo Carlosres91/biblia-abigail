@@ -1,0 +1,1 @@
+if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/biblia-abigail/sw.js', { scope: '/biblia-abigail/' })})}
