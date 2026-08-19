@@ -4,7 +4,7 @@
 
 import {
   tok, limpia, normalizaLibro,
-  parsearVersiculos, parsearJSONSeguro,
+  parsearVersiculos, parsearJSONSeguro, parsearMasivo, idPasaje,
   clave, aKey, ctxKey, refDe, versiculoDe, fragmento,
   salientesDe, entrantesDe, estudiosDe, colorPalabra, notasDelVersiculo,
   conviccionesLector, materialCerebro, materialSignature,
@@ -64,6 +64,53 @@ await test('parsearVersiculos formato "1 Texto. 2 Texto..."', () => {
 await test('parsearVersiculos formato pegado "1En el principio 2Y la tierra"', () => {
   const vs = parsearVersiculos('1En el principio 2Y la tierra');
   assert(vs.length === 2, `se esperaban 2, hay ${vs.length}`);
+});
+
+// ============================================================
+// Importador masivo
+// ============================================================
+await test('parsearMasivo parte varios capítulos con encabezados', () => {
+  const txt = [
+    'Juan 3',
+    '1 Había un hombre de los fariseos. 2 Este vino a Jesús de noche. 3 Respondió Jesús.',
+    'Juan 4',
+    '1 Cuando el Señor supo. 2 Aunque Jesús no bautizaba.',
+  ].join('\n');
+  const ps = parsearMasivo(txt);
+  assert(ps.length === 2, `se esperaban 2 pasajes, hay ${ps.length}`);
+  assert(ps[0].libro === 'Juan' && ps[0].cap === 3);
+  assert(ps[0].versiculos.length === 3, `cap 3 con 3 versículos, hay ${ps[0].versiculos.length}`);
+  assert(ps[1].cap === 4 && ps[1].versiculos.length === 2);
+});
+
+await test('parsearMasivo con formato cap:versículo (3:16)', () => {
+  const txt = 'Juan 3\n3:16 Porque de tal manera amó Dios al mundo. 3:17 Porque no envió Dios a su Hijo.';
+  const ps = parsearMasivo(txt);
+  assert(ps.length === 1 && ps[0].versiculos.length === 2, JSON.stringify(ps[0]?.versiculos?.map(v => v.n)));
+  assert(ps[0].versiculos[0].n === 16 && ps[0].versiculos[1].n === 17);
+});
+
+await test('parsearMasivo respeta libros con número (1 Juan vs Juan)', () => {
+  const txt = '1 Juan 1\n1 Lo que era desde el principio. 2 Y la vida se manifestó.';
+  const ps = parsearMasivo(txt);
+  assert(ps.length === 1 && ps[0].libro === '1 Juan', `libro: ${ps[0]?.libro}`);
+});
+
+await test('parsearMasivo no confunde menciones dentro del texto', () => {
+  const txt = 'Juan 3\n1 Nicodemo recordó Génesis 3 mientras hablaba. 2 Y vino de noche.';
+  const ps = parsearMasivo(txt);
+  assert(ps.length === 1, `mención interna creó pasaje extra: ${JSON.stringify(ps.map(p => p.libro + ' ' + p.cap))}`);
+});
+
+await test('parsearMasivo encabezado con versículo exacto y sin números', () => {
+  const txt = 'Malaquías 4:5\nHe aquí, yo os envío al profeta Elías.';
+  const ps = parsearMasivo(txt);
+  assert(ps.length === 1 && ps[0].versiculos.length === 1 && ps[0].versiculos[0].n === 5);
+});
+
+await test('idPasaje genera slug estable', () => {
+  eq(idPasaje('1 Juan', 3), 'u_1juan_3');
+  eq(idPasaje('Malaquías', 4), 'u_malaquias_4');
 });
 
 // ============================================================

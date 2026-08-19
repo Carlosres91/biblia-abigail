@@ -192,7 +192,43 @@ export function parsearVersiculos(texto) {
   return vs;
 }
 
-// -------------------- reparador de JSON de IA --------------------
+export const idPasaje = (libro, cap) => "u_" + normalizaLibro(libro) + "_" + cap;
+
+// -------------------- importador masivo (varios capítulos a la vez) ----
+// Detecta encabezados "Libro cap" o "Libro cap:vers" SOLOS en su línea
+// (así no confunde menciones dentro del texto) y parte el pegado en pasajes.
+// Devuelve [{ libro, cap, versiculos: [{n, t}] }]. Acepta versículos
+// numerados "1 2 3…" o "cap:1 cap:2…" (se les quita el prefijo del capítulo).
+export function parsearMasivo(texto) {
+  const t = String(texto || "").replace(/\r/g, "");
+  if (!t.trim()) return [];
+  const librosOrd = [...LIBROS]
+    .sort((a, b) => b.length - a.length) // "1 Juan" antes que "Juan"
+    .map((l) => l.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&").replace(/\s+/g, "\\s+"));
+  const re = new RegExp(`^\\s*(${librosOrd.join("|")})\\s+(\\d{1,3})(?::(\\d{1,3}))?[^\\n]*$`, "gim");
+  const marcas = [];
+  let m;
+  while ((m = re.exec(t))) {
+    const libro = LIBROS.find((l) => normalizaLibro(l) === normalizaLibro(m[1])) || m[1];
+    marcas.push({ libro, cap: +m[2], vers: m[3] ? +m[3] : null, inicio: m.index, fin: re.lastIndex });
+  }
+  return marcas.map((marca, i) => {
+    const fin = i + 1 < marcas.length ? marcas[i + 1].inicio : t.length;
+    let cuerpo = t.slice(marca.fin, fin).trim();
+    // Quitar prefijos "cap:" si el texto viene numerado estilo "3:16 …"
+    if (marca.vers == null) {
+      cuerpo = cuerpo.replace(new RegExp(`\\b${marca.cap}:(\\d{1,3})\\b`, "g"), "$1");
+    }
+    let versiculos = parsearVersiculos(cuerpo);
+    // Encabezado con versículo exacto ("Juan 3:16") y cuerpo sin números:
+    // todo el cuerpo es ese versículo
+    if (versiculos.length === 0 && marca.vers != null && cuerpo) {
+      versiculos = [{ n: marca.vers, t: cuerpo.replace(/^\d{1,3}[\s.):]+/, "") }];
+    }
+    return { libro: marca.libro, cap: marca.cap, versiculos };
+  });
+}
+
 export function parsearJSONSeguro(txt) {
   let t = String(txt).replace(/```json|```/g, "").trim();
   const iObj = t.indexOf("{"), iArr = t.indexOf("[");

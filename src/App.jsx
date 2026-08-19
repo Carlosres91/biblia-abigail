@@ -3,7 +3,7 @@ import {
   C, TIPOS, LIBROS, PASAJES, VOLADAS, LONG_PRESS_MS, FORM_VACIO,
   tok, limpia, normalizaLibro,
   clave, aKey, ctxKey, refDe, versiculoDe, versiculoDeClave, fragmento, fragDestino,
-  parsearVersiculos, parsearJSONSeguro,
+  parsearVersiculos, parsearJSONSeguro, parsearMasivo, idPasaje,
   salientesDe, entrantesDe, estudiosDe, colorPalabra, notasDelVersiculo,
   conviccionesLector, materialCerebro, materialSignature,
 } from "./lib/core.js";
@@ -146,6 +146,8 @@ export default function Abigail() {
   const [pasajes, setPasajes] = useState(() => ({ ...PASAJES, ...cargar("abigail.pasajes", {}) }));
   const [cargadorAbierto, setCargadorAbierto] = useState(false);
   const [cargForm, setCargForm] = useState({ libro: "", cap: "", seccion: "", texto: "" });
+  const [cargMasivo, setCargMasivo] = useState("");
+  const [cargModoMasivo, setCargModoMasivo] = useState(false);
   const [estudios, setEstudios] = useState(() => [...ESTUDIOS, ...cargar("abigail.estudios", [])]);
   const [analisisAbierto, setAnalisisAbierto] = useState(false);
   const [anCargando, setAnCargando] = useState(false);
@@ -278,12 +280,12 @@ export default function Abigail() {
 
   // ---- cargador de pasajes: parte el texto pegado en versículos ----
   const vistaPreviaCarga = cargadorAbierto ? parsearVersiculos(cargForm.texto) : [];
+  const vistaPreviaMasiva = cargadorAbierto && cargModoMasivo ? parsearMasivo(cargMasivo) : [];
 
   const guardarPasaje = () => {
     const vs = parsearVersiculos(cargForm.texto);
     if (!cargForm.libro || !cargForm.cap || vs.length === 0) return;
-    const slug = cargForm.libro.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
-    const id = "u_" + slug + "_" + cargForm.cap;
+    const id = idPasaje(cargForm.libro, cargForm.cap);
     const nuevo = {
       id,
       titulo: `${cargForm.libro} ${cargForm.cap}`,
@@ -298,6 +300,31 @@ export default function Abigail() {
     setCargadorAbierto(false);
     setCargForm({ libro: "", cap: "", seccion: "", texto: "" });
     setSel(null); setMargenAbierto(null);
+  };
+
+  // Importación masiva: varios capítulos de una sola vez
+  const guardarMasivo = (texto = cargMasivo) => {
+    const lista = parsearMasivo(texto).filter((p) => p.versiculos.length > 0);
+    if (lista.length === 0) return 0;
+    const nuevos = { ...pasajes };
+    for (const p of lista) {
+      const id = idPasaje(p.libro, p.cap);
+      nuevos[id] = {
+        id,
+        titulo: `${p.libro} ${p.cap}`,
+        corto: `${p.libro} ${p.cap}`,
+        libro: p.libro,
+        cap: p.cap,
+        seccion: "Pasaje del lector",
+        versiculos: p.versiculos,
+      };
+    }
+    setPasajes(nuevos);
+    setPasajeId(idPasaje(lista[0].libro, lista[0].cap));
+    setCargadorAbierto(false);
+    setCargMasivo("");
+    setSel(null); setMargenAbierto(null);
+    return lista.length;
   };
 
   // ---- El Consejo de IA: cliente unificado (la clave vive solo en tu dispositivo) ----
@@ -672,6 +699,8 @@ REQUISITOS DE CALIDAD:
       importarEstudio,
       parsearVersiculos,
       parsearJSONSeguro,
+      parsearMasivo,
+      guardarMasivo: (texto) => guardarMasivo(texto),
       materialCerebro: () => materialCerebro({ pasajes, estudios, cadenas, notas, vrContextos }),
       materialSignature: () => materialSignature({ estudios, cadenas, notas }),
       conviccionesLector: () => conviccionesLector(estudios),
@@ -1356,7 +1385,39 @@ REQUISITOS DE CALIDAD:
           <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(20,12,36,0.82)" }} onClick={() => setCargadorAbierto(false)}>
             <div className="w-full rounded-t-2xl px-5 pt-5 pb-8 overflow-y-auto" style={{ maxWidth: 480, maxHeight: "90vh", background: C.papel, color: C.tinta, borderTop: `3px solid ${C.oro}` }} onClick={(e) => e.stopPropagation()}>
               <div style={{ fontSize: 10, letterSpacing: "0.25em", color: C.tintaSuave }}>＋ AGREGAR PASAJE</div>
-              <h2 style={{ fontFamily: "Georgia, serif", fontSize: 19, marginTop: 4, marginBottom: 10 }}>Pega un capítulo de tu Biblia</h2>
+              <h2 style={{ fontFamily: "Georgia, serif", fontSize: 19, marginTop: 4, marginBottom: 10 }}>Pega de tu Biblia</h2>
+              <div className="flex gap-2 mb-3">
+                <button onClick={() => setCargModoMasivo(false)} className="flex-1 py-2 rounded-full" style={{ fontSize: 12.5, fontWeight: 700, background: cargModoMasivo ? "transparent" : C.noche, color: cargModoMasivo ? "#7A5E10" : C.oroClaro, border: `1px solid ${C.oro}` }}>Un capítulo</button>
+                <button onClick={() => setCargModoMasivo(true)} className="flex-1 py-2 rounded-full" style={{ fontSize: 12.5, fontWeight: 700, background: cargModoMasivo ? C.noche : "transparent", color: cargModoMasivo ? C.oroClaro : "#7A5E10", border: `1px solid ${C.oro}` }}>Varios a la vez</button>
+              </div>
+              {cargModoMasivo ? (
+                <>
+                  <div style={{ fontSize: 11.5, color: C.tintaSuave, marginBottom: 8, lineHeight: 1.5 }}>
+                    Pega varios capítulos seguidos, cada uno con su encabezado <b>solo en su línea</b> — ej.: <i>Juan 3</i> y debajo sus versículos numerados. Sirven números estilo <i>1 2 3…</i> o <i>3:16 3:17…</i>.
+                  </div>
+                  <textarea value={cargMasivo} onChange={(e) => setCargMasivo(e.target.value)} rows={9} placeholder={"Juan 3\n1 Había un hombre de los fariseos… 2 Este vino a Jesús de noche…\nJuan 4\n1 Cuando el Señor supo…"} className="w-full px-3 py-2 rounded-md mb-2" style={{ border: `1px solid ${C.papelBorde}`, background: "#FFF", fontSize: 13.5, fontFamily: "Georgia, serif" }} />
+                  {cargMasivo.trim() !== "" && (
+                    <div className="px-3 py-2 rounded-md mb-2" style={{ background: "#FFFDF6", border: `1px solid ${C.papelBorde}`, maxHeight: 180, overflowY: "auto" }}>
+                      <div style={{ fontSize: 9, letterSpacing: "0.2em", color: C.tintaSuave, marginBottom: 4 }}>
+                        VISTA PREVIA · {vistaPreviaMasiva.filter((p) => p.versiculos.length > 0).length} capítulos · {vistaPreviaMasiva.reduce((a, p) => a + p.versiculos.length, 0)} versículos
+                      </div>
+                      {vistaPreviaMasiva.map((p, i) => (
+                        <div key={i} style={{ fontSize: 12.5, marginBottom: 3, fontWeight: 700, color: p.versiculos.length > 0 ? C.tinta : "#8A3030" }}>
+                          {p.libro} {p.cap} — {p.versiculos.length > 0 ? `${p.versiculos.length} versículos ✓` : "sin versículos detectados ✗"}
+                        </div>
+                      ))}
+                      {vistaPreviaMasiva.length === 0 && <div style={{ fontSize: 12, color: C.tintaSuave }}>No detecto encabezados — pon cada «Libro capítulo» solo en su línea.</div>}
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <button onClick={() => setCargadorAbierto(false)} className="flex-1 py-2 rounded-full" style={{ border: `1px solid ${C.tinta}`, fontSize: 13 }}>Cancelar</button>
+                    <button onClick={guardarMasivo} className="flex-1 py-2 rounded-full" style={{ background: C.noche, color: C.oroClaro, fontSize: 13, fontWeight: 700, opacity: vistaPreviaMasiva.some((p) => p.versiculos.length > 0) ? 1 : 0.45 }}>
+                      Guardar {vistaPreviaMasiva.filter((p) => p.versiculos.length > 0).length || ""} capítulos
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
               <select value={cargForm.libro} onChange={(e) => setCargForm({ ...cargForm, libro: e.target.value })} className="w-full px-3 py-2 rounded-md mb-2" style={{ border: `1px solid ${C.papelBorde}`, background: "#FFF", fontSize: 14 }}>
                 <option value="">— Elige el libro —</option>
                 {LIBROS.map((l) => <option key={l} value={l}>{l}</option>)}
@@ -1389,6 +1450,8 @@ REQUISITOS DE CALIDAD:
                   Guardar pasaje
                 </button>
               </div>
+                </>
+              )}
             </div>
           </div>
         )}

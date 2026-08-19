@@ -142,6 +142,17 @@ const tests = {
     return 'Contexto histórico guardado';
   },
 
+  masivo: async (bridge) => {
+    const antes = Object.keys(bridge.getState().pasajes).length;
+    const n = bridge.guardarMasivo('Juan 5\n1 Después de estas cosas había una fiesta. 2 Y hay en Jerusalén un estanque.\nHechos 2\n1 Cuando llegó el día de Pentecostés. 2 Y de repente vino del cielo un estruendo.');
+    if (n !== 2) throw new Error(`se importaron ${n}, se esperaban 2`);
+    await waitFor(() => Object.keys(bridge.getState().pasajes).length === antes + 2, 'Pasajes no aparecieron en el estado');
+    const st = bridge.getState();
+    if (!st.pasajes['u_juan_5'] || !st.pasajes['u_hechos_2']) throw new Error('Faltan los pasajes importados');
+    if (st.pasajes['u_juan_5'].versiculos.length !== 2) throw new Error('Juan 5 mal parseado');
+    return `Importación masiva OK: Juan 5 y Hechos 2 (${st.pasajes['u_hechos_2'].versiculos.length} vers. c/u)`;
+  },
+
   persistencia: async (bridge) => {
     bridge.guardarNota('jn1:1', null, 'Persistencia test');
     await sleep(300);

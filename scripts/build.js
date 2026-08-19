@@ -65,11 +65,14 @@ child.stdout.on('data', (d) => {
   if (out.includes('built in')) setTimeout(() => child.kill('SIGKILL'), 1500);
 });
 child.stderr.on('data', (d) => process.stderr.write(d));
-setTimeout(() => child.kill('SIGKILL'), 120000); // red de seguridad
+setTimeout(() => child.kill('SIGKILL'), 120000).unref(); // red de seguridad
 child.on('exit', () => {
   if (!out.includes('built in')) {
     console.error('✗ vite build no terminó correctamente');
     process.exit(1);
   }
   generarSW();
+  // vite deja procesos hijo con el stdout abierto; sin esto el wrapper
+  // no sale nunca aunque el trabajo ya terminó
+  process.exit(0);
 });
